@@ -1,0 +1,445 @@
+<script setup lang="ts">
+import { useToast } from 'primevue/usetoast';
+import { ref, computed, onMounted, watch } from 'vue';
+import { c } from '@shared/libs/filters';
+import { useApiHandler, createPrimeVueToastHandler } from '@dashboard/services/apiHandler';
+import { useUIStore } from '@shared/stores/ui_store';
+
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+const toastHandler = createPrimeVueToastHandler(toast);
+const uiStore = useUIStore();
+
+// Application settings - use from store or create local ref
+const applicationSettings = computed({
+    get: () => uiStore.application || {
+        id: 1,
+        name: '',
+        alias: '',
+        notes: '',
+        status: true,
+        email: '',
+        phone: '',
+        address: '',
+        logo: '',
+        favicon: ''
+    },
+    set: (value) => {
+        uiStore.setApplication(value);
+    }
+});
+
+// Local ref for status to ensure immediate reactivity
+const localStatus = ref(applicationSettings.value.status ?? false);
+
+// Watch for changes in store and update local ref
+watch(() => applicationSettings.value.status, (newValue) => {
+    localStatus.value = newValue ?? false;
+}, { immediate: true });
+
+// Handle status change
+watch(localStatus, (newValue) => {
+    const current = applicationSettings.value;
+    const updated = {
+        ...current,
+        status: newValue
+    };
+    uiStore.setApplication(updated);
+});
+
+const savingApplication = ref(false);
+const logoPreview = ref('');
+const faviconPreview = ref('');
+const tempLogoFile = ref<File | null>(null);
+const tempFaviconFile = ref<File | null>(null);
+
+// Update application settings
+const updateApplicationSettings = async () => {
+    savingApplication.value = true;
+
+    const formData = new FormData();
+    const settings = applicationSettings.value;
+
+    // Add text fields
+    if (settings.name) formData.append('name', settings.name);
+    if (settings.alias) formData.append('alias', settings.alias);
+    if (settings.notes) formData.append('notes', settings.notes);
+    if (settings.description) formData.append('description', settings.description);
+    if (settings.email) formData.append('email', settings.email);
+    if (settings.phone) formData.append('phone', settings.phone);
+    if (settings.address) formData.append('address', settings.address);
+
+    // Handle boolean fields - send as '1' or '0' for Laravel validation
+    if (settings.status !== undefined) {
+        formData.append('status', settings.status ? '1' : '0');
+    }
+    if (settings.is_active !== undefined) {
+        formData.append('is_active', settings.is_active ? '1' : '0');
+    }
+
+    // Add logo file if selected - append directly without creating new File
+    if (tempLogoFile.value) {
+        formData.append('logo', tempLogoFile.value);
+    }
+
+    // Add favicon file if selected - append directly without creating new File
+    if (tempFaviconFile.value) {
+        formData.append('favicon', tempFaviconFile.value);
+    }
+
+    await apiCall({
+        endpoint: 'settings/application',
+        method: 'post',
+        payload: formData,
+        useFormData: true,
+        onSuccess: (data: any, message?: string) => {
+            // Show server response message
+            toastHandler.success(message || c('setting.messages.updated', 'setting') || 'تم تحديث الإعدادات بنجاح');
+
+            // Preserve current status from localStatus if server returns is_active instead of status
+            const updatedData = {
+                ...data,
+                status: data.status !== undefined ? data.status : (data.is_active !== undefined ? data.is_active : localStatus.value)
+            };
+
+            // Update pinia store
+            uiStore.setApplication(updatedData);
+            // Form data will be updated automatically via computed property
+            // Clear temp files
+            tempLogoFile.value = null;
+            tempFaviconFile.value = null;
+            // Update previews
+            setPreviews();
+        },
+        onError: (message) => {
+            toastHandler.error(message || c('common.messages.failed', 'common'));
+        }
+    });
+
+    savingApplication.value = false;
+};
+
+// Handle logo upload
+const handleLogoUpload = (event: { files: File[] }) => {
+    const file = event.files?.[0];
+    if (!file) return;
+
+    // Verify it's a File object (not a blob URL)
+    if (!(file instanceof File)) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'خطأ في اختيار الملف',
+            life: 3000
+        });
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'يجب اختيار صورة',
+            life: 3000
+        });
+        return;
+    }
+
+    // Check if it's PNG format
+    if (file.type !== 'image/png' && !file.name.toLowerCase().endsWith('.png')) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'يجب أن يكون الشعار بصيغة PNG',
+            life: 3000
+        });
+        return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'حجم الشعار يجب أن لا يتجاوز 2MB',
+            life: 3000
+        });
+        return;
+    }
+
+    // Clean up previous blob URL if exists
+    if (logoPreview.value && logoPreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreview.value);
+    }
+
+    tempLogoFile.value = file;
+    logoPreview.value = URL.createObjectURL(file);
+};
+
+// Handle favicon upload - must be ICO format only
+const handleFaviconUpload = (event: { files: File[] }) => {
+    const file = event.files?.[0];
+    if (!file) return;
+
+    // Verify it's a File object
+    if (!(file instanceof File)) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'خطأ في اختيار الملف',
+            life: 3000
+        });
+        return;
+    }
+
+    // Check if file is ICO
+    const fileName = file.name.toLowerCase();
+    const isIco = fileName.endsWith('.ico') ||
+                 file.type === 'image/x-icon' ||
+                 file.type === 'image/vnd.microsoft.icon' ||
+                 file.type === 'image/ico';
+
+    if (!isIco) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'يجب أن تكون الأيقونة بصيغة ICO فقط',
+            life: 3000
+        });
+        return;
+    }
+
+    if (file.size > 512 * 1024) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'حجم الأيقونة يجب أن لا يتجاوز 512KB',
+            life: 3000
+        });
+        return;
+    }
+
+    // Clean up previous blob URL if exists
+    if (faviconPreview.value && faviconPreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(faviconPreview.value);
+    }
+
+    tempFaviconFile.value = file;
+    faviconPreview.value = URL.createObjectURL(file);
+};
+
+// Set previews from existing data
+const setPreviews = () => {
+    // Logo is always at /images/logo.png (fixed path)
+    logoPreview.value = '/images/logo.png';
+    // Favicon is always at /favicon.ico (fixed path in public root)
+    faviconPreview.value = '/favicon.ico';
+};
+
+// Clear favicon preview (reset to default)
+const clearFaviconPreview = () => {
+    if (faviconPreview.value && faviconPreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(faviconPreview.value);
+    }
+    tempFaviconFile.value = null;
+    // Reset to default favicon path
+    faviconPreview.value = '/favicon.ico';
+};
+
+// Initialize from pinia state (prepared in dashboard.blade)
+// Data is already loaded from pinia store via dashboard.blade.php
+onMounted(() => {
+    // Set previews from existing data in store
+    setPreviews();
+});
+</script>
+
+<template>
+    <div class="p-6">
+        <form @submit.prevent="updateApplicationSettings">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <!-- Basic Information -->
+            <div class="space-y-4">
+                <h3 class="border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">
+                    {{ c('setting.basic_info', 'setting') || 'المعلومات الأساسية' }}
+                </h3>
+
+                <!-- Name -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        {{ c('setting.fields.name', 'setting') || 'اسم التطبيق' }}
+                    </label>
+                    <InputText
+                        v-model="applicationSettings.name"
+                        fluid
+                        :placeholder="c('common.enter', 'common') + ' ' + (c('setting.fields.name', 'setting') || 'اسم التطبيق')"
+                    />
+                </div>
+
+                <!-- Alias -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        {{ c('setting.fields.alias', 'setting') || 'الاسم المختصر' }}
+                    </label>
+                    <InputText
+                        v-model="applicationSettings.alias"
+                        fluid
+                        :placeholder="c('common.enter', 'common') + ' ' + (c('setting.fields.alias', 'setting') || 'الاسم المختصر')"
+                    />
+                </div>
+
+                <!-- Notes -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        {{ c('setting.fields.notes', 'setting') || 'ملاحظات' }}
+                    </label>
+                    <Textarea
+                        v-model="applicationSettings.notes"
+                        fluid
+                        rows="3"
+                        :placeholder="c('common.enter', 'common') + ' ' + (c('setting.fields.notes', 'setting') || 'ملاحظات')"
+                    />
+                </div>
+
+                <!-- Status -->
+                <div class="space-y-2">
+                    <div class="flex items-center gap-x-3">
+                        <Checkbox
+                            v-model="localStatus"
+                            :binary="true"
+                        />
+                        <label class="text-sm font-medium text-gray-700">
+                            {{ c('setting.fields.status', 'setting') || 'حالة التطبيق' }}
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 pr-7 flex items-start gap-1">
+                        <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>
+                            عند تعطيل حالة التطبيق، سيتم عرض صفحة الصيانة للزوار غير المسجلين. المستخدمون المسجلون يمكنهم الوصول إلى لوحة التحكم بشكل طبيعي.
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="space-y-4">
+                <h3 class="border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">
+                    {{ c('setting.contact_info', 'setting') || 'معلومات التواصل' }}
+                </h3>
+
+                <!-- Email -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        {{ c('setting.fields.email', 'setting') || 'البريد الإلكتروني' }}
+                    </label>
+                    <InputText
+                        v-model="applicationSettings.email"
+                        type="email"
+                        fluid
+                        placeholder="أدخل البريد الإلكتروني"
+                    />
+                </div>
+
+                <!-- Phone -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">رقم الهاتف</label>
+                    <InputText
+                        v-model="applicationSettings.phone"
+                        fluid
+                        placeholder="أدخل رقم الهاتف"
+                    />
+                </div>
+
+                <!-- Address -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">العنوان</label>
+                    <Textarea
+                        v-model="applicationSettings.address"
+                        fluid
+                        rows="3"
+                        placeholder="أدخل العنوان"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Images Section -->
+        <div class="mt-8">
+            <h3 class="mb-4 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">الصور والرموز</h3>
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <!-- Logo -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">شعار التطبيق</label>
+                    <div class="space-y-4">
+                        <div v-if="logoPreview" class="flex items-center gap-4">
+                            <div class="relative">
+                                <img
+                                    :src="logoPreview"
+                                    alt="Logo Preview"
+                                    class="w-32 h-32 object-contain rounded-lg border-2 border-gray-300 bg-white shadow-md"
+                                    @error="logoPreview = '/images/logo.png'"
+                                />
+                            </div>
+                        </div>
+
+                        <FileUpload
+                            accept="image/png"
+                            mode="basic"
+                            @select="handleLogoUpload"
+                            customUpload
+                            auto
+                            severity="secondary"
+                            class="p-button-outlined"
+                            :chooseLabel="logoPreview ? 'تغيير الشعار' : 'اختر الشعار'"
+                        />
+                    </div>
+                </div>
+
+                <!-- Favicon -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">أيقونة المتصفح</label>
+                    <div class="space-y-4">
+                        <div v-if="faviconPreview" class="flex items-center gap-4">
+                            <div class="relative">
+                                <img
+                                    :src="faviconPreview"
+                                    alt="Favicon Preview"
+                                    class="w-32 h-32 object-contain rounded-lg border-2 border-gray-300 bg-white shadow-md"
+                                    @error="faviconPreview = '/favicon.ico'"
+                                />
+                            </div>
+                        </div>
+
+                        <FileUpload
+                            accept=".ico,image/x-icon,image/vnd.microsoft.icon"
+                            mode="basic"
+                            @select="handleFaviconUpload"
+                            customUpload
+                            severity="secondary"
+                            class="p-button-outlined"
+                            :chooseLabel="faviconPreview ? 'تغيير الأيقونة' : 'اختر الأيقونة'"
+                        />
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 rounded bg-gray-50 p-3 text-xs text-gray-500">
+                <i class="pi pi-info-circle mr-1"></i>
+                الحد الأقصى لحجم الشعار: 2MB، أيقونة المتصفح: 512KB
+            </div>
+        </div>
+
+            <!-- Save Button -->
+            <div class="mt-6 flex justify-end">
+                <AppButton
+                    type="submit"
+                    :loading="savingApplication"
+                    label="حفظ إعدادات التطبيق"
+                    icon="pi pi-save"
+                    class="px-6"
+                />
+            </div>
+        </form>
+    </div>
+</template>
+

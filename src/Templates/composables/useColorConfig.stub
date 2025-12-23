@@ -1,0 +1,237 @@
+import { ref, computed } from 'vue';
+
+// Available color presets
+export const availableColors = [
+    {
+        name: 'أزرق - Blue',
+        value: 'blue',
+        primary: '#3b82f6',
+        description: 'اللون الأزرق الكلاسيكي'
+    },
+    {
+        name: 'أخضر - Green',
+        value: 'green',
+        primary: '#10b981',
+        description: 'لون أخضر طبيعي'
+    },
+    {
+        name: 'بنفسجي - Purple',
+        value: 'purple',
+        primary: '#8b5cf6',
+        description: 'لون بنفسجي أنيق'
+    },
+    {
+        name: 'برتقالي - Orange',
+        value: 'orange',
+        primary: '#f97316',
+        description: 'لون برتقالي دافئ'
+    },
+    {
+        name: 'وردي - Pink',
+        value: 'pink',
+        primary: '#ec4899',
+        description: 'لون وردي ناعم'
+    },
+    {
+        name: 'أحمر - Red',
+        value: 'red',
+        primary: '#ef4444',
+        description: 'لون أحمر قوي'
+    },
+    {
+        name: 'سماوي - Cyan',
+        value: 'cyan',
+        primary: '#06b6d4',
+        description: 'لون سماوي منعش'
+    },
+    {
+        name: 'رمادي - Gray',
+        value: 'gray',
+        primary: '#6b7280',
+        description: 'لون رمادي محايد'
+    }
+];
+
+// Current selected color
+const selectedColor = ref<string>('blue');
+
+// Color configuration composable
+export function useColorConfig() {
+    // Get current color from localStorage
+    const getCurrentColor = (): string => {
+        return localStorage.getItem('selected-color') || 'blue';
+    };
+
+    // Set color in localStorage
+    const setColor = (colorValue: string): void => {
+        localStorage.setItem('selected-color', colorValue);
+        selectedColor.value = colorValue;
+    };
+
+    // Get color object
+    const getColorData = (colorValue: string) => {
+        return availableColors.find(c => c.value === colorValue) || availableColors[0];
+    };
+
+    // Convert hex to oklch (simplified - using approximate conversion)
+    const hexToOklch = (hex: string): string => {
+        // Remove # if present
+        hex = hex.replace('#', '');
+
+        // Convert to RGB
+        const r = parseInt(hex.substring(0, 2), 16) / 255;
+        const g = parseInt(hex.substring(2, 4), 16) / 255;
+        const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+        // Convert RGB to OKLCH (simplified approximation)
+        // This is a basic conversion - for production, use a proper color conversion library
+        const l = 0.299 * r + 0.587 * g + 0.114 * b; // Luminance
+        const c = Math.sqrt((r - l) ** 2 + (g - l) ** 2 + (b - l) ** 2); // Chroma
+        const h = Math.atan2(b - l, r - l) * (180 / Math.PI); // Hue (simplified)
+
+        return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)})`;
+    };
+
+    // Apply color to document
+    const applyColor = (colorValue: string): void => {
+        const colorData = getColorData(colorValue);
+        const primaryHex = colorData.primary;
+
+        // Update CSS custom properties
+        const root = document.documentElement;
+
+        // Convert hex to RGB for CSS variables
+        const hex = primaryHex.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        // Calculate primary color variations
+        const primary = `oklch(0.5 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary50 = `oklch(0.97 0.05 ${getHueFromHex(primaryHex)})`;
+        const primary100 = `oklch(0.9 0.1 ${getHueFromHex(primaryHex)})`;
+        const primary200 = `oklch(0.8 0.12 ${getHueFromHex(primaryHex)})`;
+        const primary300 = `oklch(0.7 0.14 ${getHueFromHex(primaryHex)})`;
+        const primary400 = `oklch(0.6 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary500 = `oklch(0.5 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary600 = `oklch(0.4 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary700 = `oklch(0.3 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary800 = `oklch(0.2 0.15 ${getHueFromHex(primaryHex)})`;
+        const primary900 = `oklch(0.1 0.15 ${getHueFromHex(primaryHex)})`;
+
+        // Update CSS variables
+        root.style.setProperty('--primary', primary);
+        root.style.setProperty('--primary-50', primary50);
+        root.style.setProperty('--primary-100', primary100);
+        root.style.setProperty('--primary-200', primary200);
+        root.style.setProperty('--primary-300', primary300);
+        root.style.setProperty('--primary-400', primary400);
+        root.style.setProperty('--primary-500', primary500);
+        root.style.setProperty('--primary-600', primary600);
+        root.style.setProperty('--primary-700', primary700);
+        root.style.setProperty('--primary-800', primary800);
+        root.style.setProperty('--primary-900', primary900);
+
+        // Update Sidebar primary colors to match main primary
+        root.style.setProperty('--sidebar-primary', primary);
+        root.style.setProperty('--sidebar-primary-foreground', 'oklch(0.985 0 0)');
+
+        // Update PrimeVue theme
+        updatePrimeVueTheme(primaryHex);
+
+        // Save to localStorage
+        setColor(colorValue);
+
+        // Dispatch custom event
+        const event = new CustomEvent('color-changed', {
+            detail: {
+                color: colorValue,
+                primary: primaryHex,
+                colorData: colorData
+            }
+        });
+        window.dispatchEvent(event);
+    };
+
+    // Get hue from hex color (approximate)
+    const getHueFromHex = (hex: string): number => {
+        hex = hex.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16) / 255;
+        const g = parseInt(hex.substring(2, 4), 16) / 255;
+        const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0;
+
+        if (max === min) {
+            h = 0;
+        } else if (max === r) {
+            h = ((g - b) / (max - min)) % 6;
+        } else if (max === g) {
+            h = (b - r) / (max - min) + 2;
+        } else {
+            h = (r - g) / (max - min) + 4;
+        }
+
+        h = h * 60;
+        if (h < 0) h += 360;
+
+        return Math.round(h);
+    };
+
+    // Update PrimeVue theme
+    const updatePrimeVueTheme = (primaryHex: string): void => {
+        // PrimeVue uses CSS variables for theming
+        // We'll update the primary color in the theme
+        const root = document.documentElement;
+
+        // PrimeVue Aura theme uses specific CSS variables
+        // Update primary color for PrimeVue components
+        root.style.setProperty('--p-primary-color', primaryHex);
+        root.style.setProperty('--p-primary-contrast-color', '#ffffff');
+
+        // Calculate lighter and darker shades for PrimeVue
+        const hex = primaryHex.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        // Lighter shade (for hover states)
+        const lighterR = Math.min(255, Math.round(r + (255 - r) * 0.1));
+        const lighterG = Math.min(255, Math.round(g + (255 - g) * 0.1));
+        const lighterB = Math.min(255, Math.round(b + (255 - b) * 0.1));
+        const lighterHex = `#${lighterR.toString(16).padStart(2, '0')}${lighterG.toString(16).padStart(2, '0')}${lighterB.toString(16).padStart(2, '0')}`;
+
+        // Darker shade (for active states)
+        const darkerR = Math.max(0, Math.round(r * 0.8));
+        const darkerG = Math.max(0, Math.round(g * 0.8));
+        const darkerB = Math.max(0, Math.round(b * 0.8));
+        const darkerHex = `#${darkerR.toString(16).padStart(2, '0')}${darkerG.toString(16).padStart(2, '0')}${darkerB.toString(16).padStart(2, '0')}`;
+
+        root.style.setProperty('--p-primary-hover-color', lighterHex);
+        root.style.setProperty('--p-primary-active-color', darkerHex);
+    };
+
+    // Initialize color on app start
+    const initializeColor = (): void => {
+        const savedColor = getCurrentColor();
+        applyColor(savedColor);
+    };
+
+    // Computed properties
+    const currentColor = computed(() => selectedColor.value);
+    const currentColorData = computed(() => getColorData(selectedColor.value));
+
+    return {
+        availableColors,
+        currentColor,
+        currentColorData,
+        getCurrentColor,
+        setColor,
+        getColorData,
+        applyColor,
+        initializeColor
+    };
+}
+

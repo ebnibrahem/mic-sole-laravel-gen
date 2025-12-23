@@ -1,0 +1,124 @@
+<?php
+
+namespace MicSoleLaravelGen\Exceptions;
+
+use Illuminate\Foundation\Configuration\Exceptions;
+
+/**
+ * Api Custom Exceptions.
+ */
+class MICApiResponse
+{
+    static function exceptions(Exceptions $exceptions): mixed
+    {
+        // Authentication Exception
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $exception) {
+            return response()->json(
+                [
+                    'message'   => ['user_id' => [\__('Login'), \__('g.login_fail')]],
+                    'exception' => $exception::class,
+                    'status'    => 'error',
+                    'code'      => '422',
+                    'code1'      => 401,
+                    'request'   => \request()->all(),
+                    'endpoint'  => \request()->fullUrl()
+                ],
+            );
+        });
+
+        // Authorization Exception
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $exception) {
+            return response()->json(
+                [
+                    'message'   => $exception->getMessage(),
+                    'exception' => $exception::class,
+                    'status'    => 'error',
+                    'code'      => 500,
+                    'code1'      => 403,
+                    'request'   => \request()->all(),
+                    'endpoint'  => \request()->fullUrl()
+                ],
+            );
+        });
+
+        //Form Request Validation Exception
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $exception) {
+            return response()->json(
+                [
+                    'message'  => $exception->errors(),
+                    'status'   => 'error',
+                    'code'     => '422',
+                    'request'  => \request()->all(),
+                    'endpoint' => \request()->fullUrl()
+                ],
+            );
+        });
+
+        // Http Exception (abort_if)
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            return response()->json(
+                [
+                    'message'   => $exception->getMessage(),
+                    'exception' => $exception::class,
+                    'status'    => 'error',
+                    'code'      => (string) $exception->getStatusCode(),
+                    'code1'     => $exception->getStatusCode(),
+                    'request'   => \request()->all(),
+                    'endpoint'  => \request()->fullUrl()
+                ],
+                $exception->getStatusCode()
+            );
+        });
+
+        // Not FoundHttp Exception [Route, Model]
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $exception) {
+            $message = preg_match('/No query results for model/', $exception->getMessage()) ? 'No query results for you credential!' : $exception->getMessage();
+
+            return response()->json(
+                [
+                    'message' => $message,
+                    'status'   => 'error',
+                    'code'     => '404',
+                    'request'  => \request()->all(),
+                    'endpoint' => \request()->fullUrl()
+                ],
+            );
+        });
+
+        //General Exception
+        $exceptions->render(function (\Exception $exception) {
+            $status_table = [
+                'Symfony\\Component\\HttpKernel\\Exception\\NotFoundHttpException' => 404,
+                'Symfony\\Component\\HttpKernel\\Exception\\MethodNotAllowedHttpException' => 405,
+                'ErrorException' => 500,
+                'Symfony\\Component\\ErrorHandler\\Error\\FatalError"' => 500,
+                'Illuminate\\Auth\\AuthenticationException' => 401,
+                'Illuminate\Validation\ValidationException' => 422,
+            ];
+            $response['exception'] = get_class($exception);
+            $status = $status_table[$response['exception']] ?? 500;
+            $response['message'] = $exception->getMessage();
+            $response['status'] = $status;
+
+            // If debug mode is enabled
+            if (config('app.debug')) {
+                // Add the exception class name, message and stack trace to response
+            }
+            return response()->json(
+                [
+                    "status"   => 'error',
+                    "code"     => $status,
+                    'message'  => $exception->getMessage() ? $exception->getMessage() : $status,
+                    'data'     => $exception,
+                    'request'  => request()->all(),
+                    'endpoint' => \request()->fullUrl(),
+                    'trace'    => $exception->getTrace()
+                ],
+                200
+            );
+        });
+
+        return true;
+    }
+}
+

@@ -1,0 +1,168 @@
+<script lang="ts" setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@shared/stores/auth_store';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import { useToast } from 'primevue/usetoast';
+import { c } from '@dashboard/utilities/langHelper';
+
+const router = useRouter();
+const authStore = useAuthStore();
+const toast = useToast();
+// Use 'auth' base for auth endpoints (they're at /api/auth, not /api/v1/auth)
+const { apiCall } = useApiHandler('auth');
+
+const form = ref({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+});
+
+const loading = ref(false);
+const errors = ref<Record<string, string>>({});
+
+const handleRegister = async () => {
+    loading.value = true;
+    errors.value = {};
+
+    const result = await apiCall({
+        endpoint: 'auth/register',
+        method: 'post',
+        payload: form.value,
+        onSuccess: (data: any) => {
+            toast.add({
+                severity: 'success',
+                summary: c('auth.register_success', 'common') || 'نجاح',
+                detail: c('auth.register_success_message', 'common') || 'تم إنشاء الحساب بنجاح',
+                life: 3000,
+            });
+
+            // Update auth store
+            if (data.user) {
+                authStore.setUser(data.user);
+            }
+
+            // Redirect to dashboard
+            router.push('/dashboard');
+        },
+        onError: (message: string, code?: string | number, validationErrors?: Record<string, string>) => {
+            if (validationErrors) {
+                errors.value = validationErrors;
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: c('auth.register_failed', 'common') || 'خطأ',
+                    detail: message,
+                    life: 3000,
+                });
+            }
+        },
+    });
+
+    loading.value = false;
+};
+</script>
+
+<template>
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                    {{ c('auth.register_title', 'common') || 'إنشاء حساب جديد' }}
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                    {{ c('auth.register_subtitle', 'common') || 'أدخل بياناتك لإنشاء حساب جديد' }}
+                </p>
+            </div>
+            <form class="mt-8 space-y-6" @submit.prevent="handleRegister">
+                <div class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.name', 'common') || 'الاسم' }}
+                        </label>
+                        <InputText
+                            id="name"
+                            v-model="form.name"
+                            :placeholder="c('auth.name_placeholder', 'common') || 'أدخل الاسم'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.name }"
+                            required
+                        />
+                        <small v-if="errors.name" class="p-error">{{ errors.name }}</small>
+                    </div>
+
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.email', 'common') || 'البريد الإلكتروني' }}
+                        </label>
+                        <InputText
+                            id="email"
+                            v-model="form.email"
+                            type="email"
+                            :placeholder="c('auth.email_placeholder', 'common') || 'أدخل البريد الإلكتروني'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.email }"
+                            required
+                        />
+                        <small v-if="errors.email" class="p-error">{{ errors.email }}</small>
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.password', 'common') || 'كلمة المرور' }}
+                        </label>
+                        <Password
+                            id="password"
+                            v-model="form.password"
+                            :placeholder="c('auth.password_placeholder', 'common') || 'أدخل كلمة المرور'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.password }"
+                            toggleMask
+                            required
+                        />
+                        <small v-if="errors.password" class="p-error">{{ errors.password }}</small>
+                    </div>
+
+                    <div>
+                        <label for="password_confirmation" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.password_confirmation', 'common') || 'تأكيد كلمة المرور' }}
+                        </label>
+                        <Password
+                            id="password_confirmation"
+                            v-model="form.password_confirmation"
+                            :placeholder="c('auth.password_confirmation_placeholder', 'common') || 'أدخل تأكيد كلمة المرور'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.password_confirmation }"
+                            toggleMask
+                            required
+                        />
+                        <small v-if="errors.password_confirmation" class="p-error">{{ errors.password_confirmation }}</small>
+                    </div>
+                </div>
+
+                <div>
+                    <Button
+                        type="submit"
+                        :label="c('auth.register_button', 'common') || 'إنشاء حساب'"
+                        class="w-full"
+                        :loading="loading"
+                    />
+                </div>
+
+                <div class="text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        {{ c('auth.have_account', 'common') || 'لديك حساب بالفعل؟' }}
+                        <router-link
+                            to="/login"
+                            class="font-medium text-primary hover:text-primary-dark"
+                        >
+                            {{ c('auth.login_link', 'common') || 'سجل الدخول' }}
+                        </router-link>
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+

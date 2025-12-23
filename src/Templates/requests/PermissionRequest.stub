@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class PermissionRequest extends FormRequest
+{
+    public function authorize() { return true; }
+    public function rules() {
+        $permissionId = $this->route('permission') ?? $this->route('id');
+        $isUpdate = $permissionId !== null;
+
+        return [
+            'name' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:255', Rule::unique('permissions', 'name')->ignore($permissionId)],
+            'title' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['nullable', 'boolean'],
+        ];
+    }
+}

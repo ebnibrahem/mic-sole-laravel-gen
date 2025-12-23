@@ -1,0 +1,56 @@
+<?php
+
+// ============================================
+// {{modelNamePlural}}
+// ============================================
+return [
+    // معلومات عامة عن المودل
+    'name' => '{{modelNamePlural}}',
+    'title' => 'إدارة {{modelNamePlural}}',
+    'singular' => '{{modelName}}',
+    'plural' => '{{modelNamePlural}}',
+    'create' => 'إنشاء {{modelName}} جديد',
+    'create_description' => 'إضافة {{modelName}} جديد إلى النظام',
+    'edit' => 'تعديل {{modelName}}',
+    'view' => 'عرض {{modelName}}',
+    'show' => 'عرض {{modelName}}',
+    'description' => 'إدارة وعرض {{modelNamePlural}}',
+    'list_title' => 'قائمة {{modelNamePlural}}',
+
+    // الرسائل
+    'messages' => [
+        'created' => 'تم إنشاء {{modelName}} بنجاح',
+        'updated' => 'تم تحديث {{modelName}} بنجاح',
+        'deleted' => 'تم حذف {{modelName}} بنجاح',
+        'deleted_plural' => 'تم حذف {{modelNamePlural}} بنجاح',
+        'not_found' => '{{modelName}} غير موجود',
+        'not_found_plural' => '{{modelNamePlural}} غير موجودة',
+        'retrieved' => 'تم استرجاع {{modelName}} بنجاح',
+        'retrieved_plural' => 'تم استرجاع {{modelNamePlural}} بنجاح',
+        'delete_confirmation' => 'هل أنت متأكد من حذف هذا {{modelName}}؟',
+        'delete_confirmation_plural' => 'هل أنت متأكد من حذف هذه {{modelNamePlural}}؟',
+        'deleted_successfully' => 'تم حذف {{modelName}} بنجاح',
+        'bulk_deleted' => 'تم حذف العناصر المحددة بنجاح',
+        'bulk_activated' => 'تم تفعيل العناصر المحددة بنجاح',
+        'bulk_deactivated' => 'تم تعطيل العناصر المحددة بنجاح',
+    ],
+
+    // الحقول
+    'fields' => [
+{{fieldsForLang}}
+    ],
+
+    // نصوص واجهة إضافية
+    'no_{{modelNamePluralLower}}' => 'لا يوجد {{modelNamePlural}}',
+    'no_{{modelNamePluralLower}}_found' => 'لم يتم العثور على أي {{modelNamePlural}} تطابق معايير البحث',
+    'search_placeholder' => 'ابحث في {{modelNamePlural}}...',
+    'create_new' => 'إضافة {{modelName}} جديد',
+    'detail' => 'تفاصيل {{modelName}}',
+    'basic_info' => 'البيانات الأساسية',
+    'additional_info' => 'معلومات إضافية',
+    'timestamps' => 'التواريخ',
+    'statistics' => 'الإحصائيات',
+    'no_{{modelNameLower}}_selected' => 'لم يتم اختيار {{modelName}}',
+    'select_{{modelNameLower}}_to_view' => 'يرجى اختيار {{modelName}} لعرض تفاصيله',
+    'add_new_to_get_started' => 'ابدأ بإضافة {{modelName}} جديد',
+];

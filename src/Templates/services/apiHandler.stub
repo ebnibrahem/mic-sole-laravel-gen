@@ -1,0 +1,460 @@
+/**
+ * API Handler for Vue components
+ * Simplified version compatible with MicResponseTrait and MICApiResponse
+ *
+ * Uses axios ^1.13.2 (latest secure version)
+ *
+ * @module services/apiHandler
+ */
+
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+
+/**
+ * Toast Handler Interface
+ */
+export interface ToastHandler {
+    success: (message: string) => void;
+    error: (message: string) => void;
+    info?: (message: string) => void;
+    warning?: (message: string) => void;
+}
+
+/**
+ * Create PrimeVue Toast Handler
+ */
+export function createPrimeVueToastHandler(toast: any): ToastHandler {
+    return {
+        success: (message: string) => {
+            toast.add({
+                severity: 'success',
+                summary: 'نجاح',
+                detail: message,
+                life: 3000,
+            });
+        },
+        error: (message: string) => {
+            toast.add({
+                severity: 'error',
+                summary: 'خطأ',
+                detail: message,
+                life: 3000,
+            });
+        },
+        info: (message: string) => {
+            toast.add({
+                severity: 'info',
+                summary: 'معلومة',
+                detail: message,
+                life: 3000,
+            });
+        },
+        warning: (message: string) => {
+            toast.add({
+                severity: 'warn',
+                summary: 'تحذير',
+                detail: message,
+                life: 3000,
+            });
+        },
+    };
+}
+
+/**
+ * API Base URLs
+ */
+const API_BASES = {
+    dashboard: '/api/v1',
+    website: '/api/website',
+    auth: '/api', // Auth endpoints are at /api/auth (not /api/v1/auth)
+} as const;
+
+type ApiBase = 'dashboard' | 'website' | 'auth';
+
+/**
+ * Pagination Meta
+ */
+export interface PaginationMeta {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
+/**
+ * API Call Options
+ */
+export interface ApiCallOptions<T = any> {
+    endpoint: string; // API endpoint (e.g., 'posts', 'posts/1')
+    payload?: any; // Request payload
+    method?: 'get' | 'post' | 'put' | 'patch' | 'delete'; // HTTP method
+    useFormData?: boolean; // Use FormData for file uploads
+    params?: Record<string, any>; // Query parameters (for GET requests)
+
+    // Response handling
+    onSuccess?: (data: T, message?: string) => void;
+    onSuccessPaginate?: (data: T[], meta: PaginationMeta, options?: any, message?: string) => void;
+    onError?: (message: string, code?: string | number, validationErrors?: Record<string, string>) => void;
+
+    // Advanced options
+    extractText?: boolean; // Extract text from HTML messages
+}
+
+/**
+ * API Call Result
+ */
+export interface ApiCallResult<T = any> {
+    success: boolean;
+    data?: T;
+    meta?: PaginationMeta;
+    options?: any;
+    message?: string;
+    code?: string | number;
+    validationErrors?: Record<string, string>;
+    isPaginated?: boolean;
+}
+
+/**
+ * Parse Laravel validation errors
+ */
+function parseValidationError(errors: any): string {
+    if (!errors) return 'خطأ في التحقق من البيانات';
+
+    if (typeof errors === 'string') {
+        return errors;
+    }
+
+    if (typeof errors === 'object') {
+        const messages: string[] = [];
+        Object.keys(errors).forEach((key) => {
+            if (Array.isArray(errors[key]) && errors[key].length > 0) {
+                messages.push(errors[key][0]);
+            } else if (typeof errors[key] === 'string') {
+                messages.push(errors[key]);
+            }
+        });
+        return messages.join(', ') || 'خطأ في التحقق من البيانات';
+    }
+
+    return 'خطأ في التحقق من البيانات';
+}
+
+/**
+ * Get CSRF token from meta tag
+ */
+function getCsrfToken(): string | null {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : null;
+}
+
+/**
+ * Create axios instance with default config
+ * Includes security configurations for axios ^1.13.2
+ */
+function createAxiosInstance(baseURL: string): AxiosInstance {
+    const instance = axios.create({
+        baseURL,
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        // Security: Set max content length to prevent DoS attacks
+        maxContentLength: 50 * 1024 * 1024, // 50MB
+        maxBodyLength: 50 * 1024 * 1024, // 50MB
+        timeout: 30000, // 30 seconds timeout
+    });
+
+    // Add CSRF token to requests
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+        instance.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
+    }
+
+    // Add Bearer token from localStorage if available
+    const authToken = localStorage.getItem('auth_token');
+    if (authToken) {
+        instance.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    return instance;
+}
+
+/**
+ * Handle API response and errors
+ * Compatible with MicResponseTrait and MICApiResponse
+ */
+export function useApiHandler(base: ApiBase = 'dashboard') {
+    const apiBase = API_BASES[base];
+    const axiosInstance = createAxiosInstance(apiBase);
+
+    // Add request interceptor to include token in every request and handle FormData
+    axiosInstance.interceptors.request.use((config) => {
+        const authToken = localStorage.getItem('auth_token');
+        if (authToken) {
+            config.headers.Authorization = `Bearer ${authToken}`;
+        }
+
+        // If payload is FormData, remove Content-Type to let axios set it automatically
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
+
+        return config;
+    });
+
+    /**
+     * Simplified API Call
+     */
+    const apiCall = async <T = any>(
+        options: ApiCallOptions<T>
+    ): Promise<ApiCallResult<T>> => {
+        const {
+            endpoint,
+            payload,
+            method = 'get',
+            useFormData = false,
+            params,
+            onSuccess,
+            onSuccessPaginate,
+            onError,
+            extractText = false,
+        } = options;
+
+        try {
+            const fullPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            let response: any;
+
+            // Prepare request config
+            const config: AxiosRequestConfig = {};
+
+            if (method === 'get') {
+                config.params = params;
+                response = await axiosInstance.get(fullPath, config);
+            } else {
+                // POST, PUT, PATCH, DELETE
+                let actualMethod: 'post' | 'put' | 'patch' | 'delete' = method;
+
+                if (useFormData && payload instanceof FormData) {
+                    // For PUT/PATCH with FormData, Laravel needs POST method with _method override
+                    // This is because browsers don't support PUT/PATCH with multipart/form-data
+                    if (method === 'put' || method === 'patch') {
+                        if (!payload.has('_method')) {
+                            payload.append('_method', method.toUpperCase());
+                        }
+                        // Change method to POST for FormData PUT/PATCH requests
+                        actualMethod = 'post';
+                    }
+
+                    // Remove image/logo/favicon if it's a string (not a File object)
+                    // This prevents sending blob URLs or other string values instead of actual files
+                    ['image', 'logo', 'favicon'].forEach((fieldName) => {
+                        if (payload.has(fieldName)) {
+                            const fieldValue = payload.get(fieldName);
+                            if (fieldValue && typeof fieldValue === 'string') {
+                                payload.delete(fieldName);
+                            }
+                        }
+                    });
+
+                    // Initialize headers if not exists
+                    if (!config.headers) {
+                        config.headers = {};
+                    }
+
+                    // Remove Content-Type header completely - axios will set it automatically with boundary
+                    // This is critical for FormData to work correctly
+                    // Axios automatically sets Content-Type to multipart/form-data with boundary for FormData
+                    delete config.headers['Content-Type'];
+
+                    // Also remove from common headers to ensure it's not set
+                    // Store original to restore later if needed
+                    const originalContentType = axiosInstance.defaults.headers.common['Content-Type'];
+                    if (originalContentType) {
+                        delete axiosInstance.defaults.headers.common['Content-Type'];
+                    }
+                }
+
+                switch (actualMethod) {
+                    case 'post':
+                        response = await axiosInstance.post(fullPath, payload, config);
+                        break;
+                    case 'put':
+                        response = await axiosInstance.put(fullPath, payload, config);
+                        break;
+                    case 'patch':
+                        response = await axiosInstance.patch(fullPath, payload, config);
+                        break;
+                    case 'delete':
+                        response = await axiosInstance.delete(fullPath, config);
+                        break;
+                }
+            }
+
+            // Handle response (MicResponseTrait format)
+            const { status, message, data, code } = response.data || {};
+
+            // Handle success
+            if (status === 'success') {
+                const cleanMessage = extractText && message
+                    ? message.replace(/<[^>]*>/g, '').trim()
+                    : message;
+
+                // Check if data is paginated (has data.data and data.meta structure)
+                const isPaginated = data && typeof data === 'object' && 'data' in data && 'meta' in data;
+
+                let result: ApiCallResult<T>;
+
+                if (isPaginated) {
+                    // Paginated response structure: { data: [...], meta: {...}, options: {...} }
+                    result = {
+                        success: true,
+                        data: data.data,
+                        meta: data.meta,
+                        options: data.options,
+                        message: cleanMessage,
+                        isPaginated: true,
+                    };
+
+                    // Call paginated success callback if provided
+                    if (onSuccessPaginate) {
+                        onSuccessPaginate(data.data as T[], data.meta, data.options, cleanMessage);
+                    } else if (onSuccess) {
+                        // Fallback to regular onSuccess if onSuccessPaginate not provided
+                        onSuccess(data.data as T, cleanMessage);
+                    }
+                } else {
+                    // Regular response
+                    result = {
+                        success: true,
+                        data,
+                        message: cleanMessage,
+                    };
+
+                    // Call success callback
+                    if (onSuccess) {
+                        onSuccess(data as T, cleanMessage);
+                    }
+                }
+
+                return result;
+            }
+
+            // Handle error (status === 'error')
+            if (status === 'error') {
+                let errorMessage: string;
+                let validationErrors: Record<string, string> | undefined;
+
+                // Handle 422 validation errors (from MICApiResponse.php)
+                if (code === 422 || code === '422') {
+                    // Parse Laravel validation errors
+                    if (message && typeof message === 'object') {
+                        // Convert { field: [error1, error2] } to { field: error1 }
+                        validationErrors = {};
+                        Object.keys(message).forEach((key) => {
+                            if (Array.isArray(message[key]) && message[key].length > 0) {
+                                validationErrors![key] = message[key][0];
+                            } else if (typeof message[key] === 'string') {
+                                validationErrors![key] = message[key];
+                            }
+                        });
+                        errorMessage = parseValidationError(message);
+                    } else if (typeof message === 'string') {
+                        errorMessage = message;
+                    } else {
+                        errorMessage = 'خطأ في طريقة إدخال البيانات';
+                    }
+                } else {
+                    // Other errors (non-422)
+                    errorMessage = message || 'حدث خطأ أثناء تحميل البيانات';
+
+                    // Extract text from HTML if needed
+                    if (extractText && typeof errorMessage === 'string') {
+                        const isHTML = errorMessage.includes('<') && errorMessage.includes('>');
+                        if (isHTML) {
+                            errorMessage = errorMessage.replace(/<[^>]*>/g, '').trim();
+                        }
+                    }
+                }
+
+                // Call error callback
+                if (onError) {
+                    onError(errorMessage, code, validationErrors);
+                }
+
+                return {
+                    success: false,
+                    message: errorMessage,
+                    code,
+                    validationErrors,
+                };
+            }
+
+            // Unknown status
+            return {
+                success: false,
+                message: 'Unknown error',
+            };
+
+        } catch (error: any) {
+            console.error('API Error:', error);
+
+            let errorMessage = 'حدث خطأ أثناء تحميل البيانات';
+            let validationErrors: Record<string, string> | undefined;
+            let errorCode: string | number | undefined;
+
+            // Handle axios errors
+            if (error.response?.data) {
+                const apiResponse = error.response.data;
+                errorCode = error.response.status || apiResponse.code;
+
+                // Handle 422 validation errors
+                if (error.response.status === 422 || apiResponse.code === 422 || apiResponse.code === '422') {
+                    const validationData = apiResponse.message || apiResponse.errors;
+
+                    if (validationData && typeof validationData === 'object') {
+                        validationErrors = {};
+                        Object.keys(validationData).forEach((key) => {
+                            if (Array.isArray(validationData[key]) && validationData[key].length > 0) {
+                                validationErrors![key] = validationData[key][0];
+                            } else if (typeof validationData[key] === 'string') {
+                                validationErrors![key] = validationData[key];
+                            }
+                        });
+                        errorMessage = parseValidationError(validationData);
+                    } else if (typeof validationData === 'string') {
+                        errorMessage = validationData;
+                    } else {
+                        errorMessage = parseValidationError(validationData);
+                    }
+                } else if (apiResponse.message) {
+                    errorMessage = extractText && typeof apiResponse.message === 'string'
+                        ? apiResponse.message.replace(/<[^>]*>/g, '').trim()
+                        : apiResponse.message;
+                }
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            // Call error callback
+            if (onError) {
+                onError(errorMessage, errorCode, validationErrors);
+            }
+
+            return {
+                success: false,
+                message: errorMessage,
+                code: errorCode,
+                validationErrors,
+            };
+        }
+    };
+
+    return {
+        apiCall,
+        apiBase,
+        axiosInstance,
+    };
+}
+

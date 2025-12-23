@@ -1,0 +1,47 @@
+<script lang="ts" setup>
+import { computed } from 'vue';
+import { useAuthStore } from '@shared/stores/auth_store';
+
+interface Props {
+    // الصلاحيات المطلوبة - يمكن أن تكون صلاحية واحدة أو مصفوفة
+    permissions?: string | string[];
+    // نوع التحقق من الصلاحيات: 'any' (أي صلاحية) أو 'all' (جميع الصلاحيات)
+    permissionMode?: 'any' | 'all';
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    permissionMode: 'any',
+});
+
+// Store
+const authStore = useAuthStore();
+
+// Computed
+const hasRequiredPermissions = computed(() => {
+    // إذا لم يتم تحديد صلاحيات، اعرض المحتوى دائماً
+    if (!props.permissions) return true;
+
+    // إذا كان المستخدم غير مسجل دخول، لا تعرض المحتوى
+    if (!authStore.user) return false;
+
+    // تحويل الصلاحية الواحدة إلى مصفوفة
+    const permissionsArray = Array.isArray(props.permissions)
+        ? props.permissions
+        : [props.permissions];
+
+    // التحقق من الصلاحيات حسب النوع المحدد
+    if (props.permissionMode === 'all') {
+        return authStore.hasAllPermissions(permissionsArray);
+    } else {
+        return authStore.hasPermissions(permissionsArray);
+    }
+});
+</script>
+
+<template>
+    <!-- عرض المحتوى فقط إذا كان لديه الصلاحيات المطلوبة -->
+    <template v-if="hasRequiredPermissions">
+        <slot />
+    </template>
+</template>
+

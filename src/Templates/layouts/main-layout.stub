@@ -1,0 +1,118 @@
+<script setup lang="ts">
+import type { Application } from "@shared/types/responses";
+import { onMounted, ref } from "vue";
+import ConfirmDialog from "primevue/confirmdialog";
+import Toast from "primevue/toast";
+import AppSidebar from "./app-sidebar.vue";
+import AppHeader from "./app-header.vue";
+
+defineOptions({
+    name: "MainLayout",
+});
+
+defineProps<{
+    links: any[];
+    user: any;
+    title: string;
+    application: Application | null;
+    loading: boolean;
+}>();
+
+const sidebarCollapsed = ref(false);
+const mobileSidebarOpen = ref(false);
+
+const toggleSidebar = () => {
+    sidebarCollapsed.value = !sidebarCollapsed.value;
+    localStorage.setItem(
+        "sidebar-collapsed",
+        sidebarCollapsed.value.toString(),
+    );
+};
+
+const toggleMobileSidebar = () => {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value;
+    if (mobileSidebarOpen.value && window.innerWidth <= 768) {
+        sidebarCollapsed.value = false;
+    }
+};
+
+const closeMobileSidebar = () => {
+    mobileSidebarOpen.value = false;
+};
+
+const initializeApp = () => {
+    const savedSidebar = localStorage.getItem("sidebar-collapsed");
+    if (savedSidebar) {
+        sidebarCollapsed.value = savedSidebar === "true";
+    }
+
+    const handleResize = () => {
+        if (window.innerWidth <= 768) {
+            mobileSidebarOpen.value = false;
+            sidebarCollapsed.value = false;
+        } else {
+            const savedSidebar = localStorage.getItem("sidebar-collapsed");
+            if (savedSidebar) {
+                sidebarCollapsed.value = savedSidebar === "true";
+            }
+        }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+};
+
+onMounted(() => {
+    initializeApp();
+});
+</script>
+
+<template>
+    <div class="flex min-h-screen bg-background">
+        <!-- Sidebar -->
+        <AppSidebar
+            :links="links"
+            :user="user"
+            :application="application"
+            :collapsed="sidebarCollapsed"
+            :mobile-open="mobileSidebarOpen"
+            @toggle-sidebar="toggleSidebar"
+            @close-mobile-sidebar="closeMobileSidebar"
+        />
+
+        <!-- Main Content -->
+        <main
+            class="flex-1 flex flex-col overflow-hidden transition-all duration-300 max-sm:mr-0"
+            :class="{
+                'md:mr-[280px]': !sidebarCollapsed && !mobileSidebarOpen,
+                'md:mr-[70px]': sidebarCollapsed && !mobileSidebarOpen
+            }"
+        >
+            <!-- Header -->
+            <AppHeader
+                :title="title"
+                :user="user"
+                @toggle-mobile-sidebar="toggleMobileSidebar"
+                @toggle-desktop-sidebar="toggleSidebar"
+            />
+
+            <!-- Toast & Confirm Dialog -->
+            <ConfirmDialog />
+            <Toast />
+
+            <!-- Content -->
+            <div id="inner-dashboard-content" class="max-sm:p-0 md:p-8">
+                <slot />
+            </div>
+        </main>
+
+        <!-- Mobile Overlay -->
+        <div
+            v-if="mobileSidebarOpen"
+            class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+            :class="{ 'opacity-100': mobileSidebarOpen, 'opacity-0': !mobileSidebarOpen }"
+            @click="closeMobileSidebar"
+        />
+    </div>
+</template>
+

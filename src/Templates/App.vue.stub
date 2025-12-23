@@ -1,0 +1,132 @@
+<script lang="ts" setup>
+import { onMounted } from 'vue';
+import { useAuthStore } from '@shared/stores/auth_store';
+import { useUIStore } from '@shared/stores/ui_store';
+// Using axios ^1.13.2 (latest secure version)
+import axios from 'axios';
+import { RouterView, useRouter } from 'vue-router';
+import routes from '@dashboard/router/routes';
+import MainLayout from '@dashboard/layouts/main-layout.vue';
+
+interface Props {
+    bearer?: string | null;
+    auth?: {
+        id: number;
+        name: string;
+        email: string;
+        roles?: Array<{
+            id: number;
+            name: string;
+            permissions?: Array<{
+                id: number;
+                name: string;
+            }>;
+        }>;
+    } | null;
+    application?: {
+        id: number;
+        name: string;
+        logo?: string;
+    } | null;
+    settings?: {
+        notifications?: Array<{
+            id: string;
+            type: string;
+            data: any;
+            read_at?: string | null;
+            created_at: string;
+        }>;
+        unread_notifications_count?: number;
+        [key: string]: any; // Allow any additional settings
+    };
+    dropdowns?: Record<string, any>; // Allow any dropdown data
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    bearer: null,
+    auth: null,
+    application: null,
+    settings: () => ({}),
+    dropdowns: () => ({}),
+});
+
+// Initialize stores
+const authStore = useAuthStore();
+const uiStore = useUIStore();
+const router = useRouter();
+
+// Prepare menu links from routes
+const links = routes
+    .filter((r) => r.meta?.show_in_menu)
+    .map((r) => {
+        return {
+            name: r.name as string,
+            path: r.path,
+            icon: r.meta?.icon,
+            children: r.meta?.children,
+            permissions: r.meta?.permissions as string[],
+            label: r.meta?.label,
+        };
+    });
+
+uiStore.setMainMenu(links);
+
+onMounted(() => {
+    // Set bearer token for axios (axios ^1.13.2)
+    if (props.bearer) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${props.bearer}`;
+    }
+
+    // Set user in auth store
+    if (props.auth) {
+        authStore.setUser(props.auth as any);
+        authStore.isAuthenticated = true;
+    }
+
+    // Set application in UI store
+    if (props.application) {
+        uiStore.setApplication(props.application as any);
+    }
+
+    // Initialize settings from props (cached data from Laravel)
+    // This includes notifications, unread count, and any other settings
+    if (props.settings) {
+        uiStore.setSettings(props.settings);
+    }
+
+    // Store dropdowns data (cached static data)
+    if (props.dropdowns) {
+        uiStore.setSettings({ dropdowns: props.dropdowns });
+    }
+});
+</script>
+
+<template>
+    <div id="dashboard-app">
+        <MainLayout
+            :loading="uiStore.loading"
+            :title="'لوحة التحكم'"
+            :user="authStore.user || {}"
+            :links="uiStore.mainMenu"
+            :application="uiStore.application"
+        >
+            <router-view v-slot="{ Component, route }">
+                <transition name="page-transition" mode="out-in">
+                    <component :is="Component" :key="route.path" />
+                </transition>
+            </router-view>
+        </MainLayout>
+    </div>
+</template>
+
+<style scoped>
+.page-transition-enter-active,
+.page-transition-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.page-transition-enter-from,
+.page-transition-leave-to {
+    opacity: 0;
+}
+</style>

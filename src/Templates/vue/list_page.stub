@@ -1,0 +1,309 @@
+<script lang="ts" setup>
+import { c, lang } from '@dashboard/utilities/langHelper';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import type { Page } from '@shared/types/page';
+import { useToast } from 'primevue/usetoast';
+import { ref, onMounted, reactive, shallowRef } from 'vue';
+import { useRouter } from 'vue-router';
+import PageTable from './_pages/table.vue';
+import PageFilter from './_pages/filter.vue';
+
+const router = useRouter();
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+
+// Use shallowRef for large lists to improve memory performance
+// shallowRef only tracks top-level changes, reducing reactivity overhead
+const {{modelNamePluralLower}} = shallowRef<{{modelName}}[]>([]);
+const loading = ref(false);
+const showAdvancedFilters = ref(false);
+
+const pagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0,
+});
+
+const filters = reactive({
+    search: '',
+    sort_by: 'id',
+    sort_order: 'desc' as 'asc' | 'desc',
+    // Add more filters as needed
+});
+
+const pageOptions = ref({});
+
+const load{{modelNamePlural}} = async (customFilters = {}) => {
+    loading.value = true;
+    const allFilters = { ...filters, ...customFilters };
+    const cleanFilters = Object.fromEntries(
+        Object.entries(allFilters).filter(([, value]) => value !== '' && value !== undefined && value !== null),
+    );
+
+    await apiCall({
+        endpoint: '{{modelNamePluralLower}}',
+        method: 'get',
+        params: {
+            ...cleanFilters,
+            page: pagination.value.current_page,
+            per_page: pagination.value.per_page,
+        },
+        onSuccessPaginate: (data: {{modelName}}[], meta, options, message) => {
+            {{modelNamePluralLower}}.value = data || [];
+            pagination.value = meta || {
+                current_page: 1,
+                last_page: 1,
+                per_page: 15,
+                total: 0,
+                from: 0,
+                to: 0,
+            };
+            pageOptions.value = options || {};
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || lang('common.messages.error_loading', '{{modelNameLower}}.singular', 'common'),
+                life: 3000,
+            });
+        },
+    });
+
+    loading.value = false;
+};
+
+const handle{{modelName}}Selected = ({{modelNameLower}}: {{modelName}}) => {
+    router.push({ name: '{{modelNamePluralLower}}.show', params: { id: {{modelNameLower}}.id } });
+};
+
+const handle{{modelName}}Edit = ({{modelNameLower}}: {{modelName}}) => {
+    router.push({
+        name: '{{modelNamePluralLower}}.show',
+        params: { id: {{modelNameLower}}.id },
+        query: { tab: 'edit' },
+    });
+};
+
+const handle{{modelName}}Delete = async ({{modelNameLower}}: {{modelName}}) => {
+    await apiCall({
+        endpoint: `{{modelNamePluralLower}}/${ {{modelNameLower}}.id }`,
+        method: 'delete',
+        onSuccess: (data, message) => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.deleted', 'common'),
+                detail: message || lang('common.messages.deleted', '{{modelNameLower}}.singular', 'common'),
+                life: 3000,
+            });
+            {{modelNamePluralLower}}.value = {{modelNamePluralLower}}.value.filter((item) => item.id !== {{modelNameLower}}.id);
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || lang('common.messages.not_found', '{{modelNameLower}}.singular', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleBulkDelete = async (ids: number[]) => {
+    if (ids.length === 0) return;
+
+    await apiCall({
+        endpoint: '{{modelNamePluralLower}}/bulk-delete',
+        method: 'post',
+        payload: { ids },
+        onSuccess: (data, message) => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.deleted', 'common'),
+                detail: message || c('common.messages.bulk_deleted', 'common'),
+                life: 3000,
+            });
+            load{{modelNamePlural}}();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.messages.failed', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleBulkActivate = async (ids: number[]) => {
+    if (ids.length === 0) return;
+
+    await apiCall({
+        endpoint: '{{modelNamePluralLower}}/bulk-activate',
+        method: 'post',
+        payload: { ids },
+        onSuccess: (data, message) => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: message || c('common.messages.bulk_activated', 'common'),
+                life: 3000,
+            });
+            load{{modelNamePlural}}();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.messages.failed', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleBulkDeactivate = async (ids: number[]) => {
+    if (ids.length === 0) return;
+
+    await apiCall({
+        endpoint: '{{modelNamePluralLower}}/bulk-deactivate',
+        method: 'post',
+        payload: { ids },
+        onSuccess: (data, message) => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: message || c('common.messages.bulk_deactivated', 'common'),
+                life: 3000,
+            });
+            load{{modelNamePlural}}();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('{{modelNameLower}}.messages.not_found', '{{modelNameLower}}'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleRefresh = () => {
+    load{{modelNamePlural}}();
+};
+
+const handleFilter = (newFilters: any = {}) => {
+    pagination.value.current_page = 1;
+    load{{modelNamePlural}}(newFilters);
+};
+
+const handleResetFilters = () => {
+    showAdvancedFilters.value = false;
+    pagination.value.current_page = 1;
+    load{{modelNamePlural}}();
+};
+
+const handlePageChange = (page: number) => {
+    pagination.value.current_page = page;
+    load{{modelNamePlural}}();
+};
+
+const handlePageSizeChange = (pageSize: number) => {
+    pagination.value.per_page = pageSize;
+    pagination.value.current_page = 1;
+    load{{modelNamePlural}}();
+};
+
+const handleSortChange = (sortBy: string, sortOrder: 'asc' | 'desc') => {
+    filters.sort_by = sortBy;
+    filters.sort_order = sortOrder;
+    pagination.value.current_page = 1;
+    load{{modelNamePlural}}();
+};
+
+const handleLoadData = (newFilters: any) => {
+    Object.assign(filters, newFilters);
+    pagination.value.current_page = 1;
+    load{{modelNamePlural}}();
+};
+
+const toggleAdvancedFilters = () => {
+    showAdvancedFilters.value = !showAdvancedFilters.value;
+};
+
+onMounted(async () => {
+    await load{{modelNamePlural}}();
+});
+</script>
+
+<template>
+    <div class="p-4">
+        <!-- Page Header -->
+        <PageHeader
+            :title="c('{{modelNameLower}}.list_title', '{{modelNameLower}}')"
+            :description="c('{{modelNameLower}}.description', '{{modelNameLower}}')"
+            icon="pi pi-list"
+            :breadcrumb="[
+                { label: c('common.home', 'common'), to: '/dashboard', icon: 'pi pi-home' },
+                { label: c('{{modelNameLower}}.plural', '{{modelNameLower}}') }
+            ]"
+        >
+            <template #actions>
+                <AppButton
+                    size="small"
+                    :label="showAdvancedFilters ? c('common.hide_advanced', 'common') : c('common.show_advanced', 'common')"
+                    :icon="showAdvancedFilters ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                    @click="toggleAdvancedFilters"
+                    severity="info"
+                    outlined
+                />
+                <AppButton
+                    size="small"
+                    :label="c('{{modelNameLower}}.create', '{{modelNameLower}}')"
+                    icon="pi pi-plus"
+                    :permissions="['{{modelNameLower}}_create']"
+                    @click="router.push({ name: '{{modelNamePluralLower}}.create' })"
+                    severity="success"
+                />
+            </template>
+        </PageHeader>
+
+        <!-- Filter Component -->
+        <{{modelName}}Filter
+            :modelValue="filters"
+            @update:modelValue="(value: any) => Object.assign(filters, value)"
+            :pageOptions="pageOptions"
+            :loading="loading"
+            :show-advanced="showAdvancedFilters"
+            @filter="handleFilter"
+            @reset="handleResetFilters"
+        />
+
+        <!-- Table Component -->
+        <{{modelName}}Table
+            :{{modelNamePluralLower}}="{{modelNamePluralLower}}"
+            :loading="loading"
+            :pagination="pagination"
+            :show-actions="true"
+            :filters="filters"
+            :sort-order="filters.sort_order"
+            @{{modelNameLower}}-selected="handle{{modelName}}Selected"
+            @{{modelNameLower}}-edit="handle{{modelName}}Edit"
+            @{{modelNameLower}}-delete="handle{{modelName}}Delete"
+            @bulk-delete="handleBulkDelete"
+            @bulk-activate="handleBulkActivate"
+            @bulk-deactivate="handleBulkDeactivate"
+            @refresh="handleRefresh"
+            @page-change="handlePageChange"
+            @page-size-change="handlePageSizeChange"
+            @sort-change="handleSortChange"
+            @load-data="handleLoadData"
+        />
+    </div>
+</template>
+

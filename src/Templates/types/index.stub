@@ -1,0 +1,73 @@
+/**
+ * Dashboard TypeScript types
+ *
+ * @module types
+ */
+
+/**
+ * Base model interface
+ */
+export interface BaseModel {
+    id: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * Paginated response structure
+ */
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        per_page: number;
+        current_page: number;
+        last_page: number;
+        from: number;
+        to: number;
+    };
+    options?: any;
+}
+
+/**
+ * Permission interface
+ */
+export interface Permission {
+    id: number;
+    name: string;
+    guard_name?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * Role interface
+ */
+export interface Role {
+    id: number;
+    name: string;
+    guard_name?: string;
+    permissions?: Permission[];
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * User interface
+ */
+export interface User extends BaseModel {
+    name: string;
+    email: string;
+    email_verified_at?: string;
+    roles?: Role[];
+}
+
+/**
+ * Application interface
+ */
+export interface Application extends BaseModel {
+    name: string;
+    logo?: string;
+    description?: string;
+}
+

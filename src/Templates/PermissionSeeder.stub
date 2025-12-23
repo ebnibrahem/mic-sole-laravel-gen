@@ -1,0 +1,72 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\Permission;
+
+class PermissionSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // User permissions
+        Permission::firstOrCreate(
+            ['name' => 'user_access'],
+            ['title' => 'الوصول للمستخدمين']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'user_create'],
+            ['title' => 'إنشاء مستخدم']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'user_edit'],
+            ['title' => 'تعديل مستخدم']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'user_delete'],
+            ['title' => 'حذف مستخدم']
+        );
+
+        // Role permissions
+        Permission::firstOrCreate(
+            ['name' => 'role_access'],
+            ['title' => 'الوصول للأدوار']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'role_create'],
+            ['title' => 'إنشاء دور']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'role_edit'],
+            ['title' => 'تعديل دور']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'role_delete'],
+            ['title' => 'حذف دور']
+        );
+
+        // Permission permissions
+        Permission::firstOrCreate(
+            ['name' => 'permission_access'],
+            ['title' => 'الوصول للصلاحيات']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'permission_create'],
+            ['title' => 'إنشاء صلاحية']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'permission_edit'],
+            ['title' => 'تعديل صلاحية']
+        );
+        Permission::firstOrCreate(
+            ['name' => 'permission_delete'],
+            ['title' => 'حذف صلاحية']
+        );
+
+         // Statistic permissions
+        Permission::firstOrCreate(
+            ['name' => 'dashboard_access'],
+            ['title' => 'الوصول للوحة الإحصائية', 'is_active' => true]
+        );
+    }
+}

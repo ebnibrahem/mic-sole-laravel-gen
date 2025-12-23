@@ -1,0 +1,342 @@
+<template>
+  <div class="tiptap-editor">
+    <div v-if="editor" class="editor-toolbar">
+      <!-- Text Formatting -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleBold().run()"
+          :class="{ 'is-active': editor.isActive('bold') }"
+          class="toolbar-button"
+          title="عريض"
+        >
+          <strong>B</strong>
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleItalic().run()"
+          :class="{ 'is-active': editor.isActive('italic') }"
+          class="toolbar-button"
+          title="مائل"
+        >
+          <em>I</em>
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleStrike().run()"
+          :class="{ 'is-active': editor.isActive('strike') }"
+          class="toolbar-button"
+          title="خط في المنتصف"
+        >
+          <s>S</s>
+        </button>
+      </div>
+
+      <!-- Headings -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
+          :class="{ 'is-active': editor.isActive('heading', { level: 1 }) }"
+          class="toolbar-button"
+          title="عنوان 1"
+        >
+          H1
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
+          :class="{ 'is-active': editor.isActive('heading', { level: 2 }) }"
+          class="toolbar-button"
+          title="عنوان 2"
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
+          :class="{ 'is-active': editor.isActive('heading', { level: 3 }) }"
+          class="toolbar-button"
+          title="عنوان 3"
+        >
+          H3
+        </button>
+      </div>
+
+      <!-- Lists -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleBulletList().run()"
+          :class="{ 'is-active': editor.isActive('bulletList') }"
+          class="toolbar-button"
+          title="قائمة نقطية"
+        >
+          <i class="pi pi-list"></i>
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleOrderedList().run()"
+          :class="{ 'is-active': editor.isActive('orderedList') }"
+          class="toolbar-button"
+          title="قائمة مرقمة"
+        >
+          <span style="font-weight: bold;">1.</span>
+        </button>
+      </div>
+
+      <!-- Blockquote & Code -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleBlockquote().run()"
+          :class="{ 'is-active': editor.isActive('blockquote') }"
+          class="toolbar-button"
+          title="اقتباس"
+        >
+          <span style="font-size: 1.2em;">"</span>
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().toggleCodeBlock().run()"
+          :class="{ 'is-active': editor.isActive('codeBlock') }"
+          class="toolbar-button"
+          title="كود"
+        >
+          <i class="pi pi-code"></i>
+        </button>
+      </div>
+
+      <!-- Image -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="openImageDialog"
+          class="toolbar-button"
+          title="صورة"
+        >
+          <i class="pi pi-image"></i>
+        </button>
+      </div>
+
+      <!-- Undo/Redo -->
+      <div class="toolbar-group">
+        <button
+          type="button"
+          @click="editor.chain().focus().undo().run()"
+          :disabled="!editor.can().undo()"
+          class="toolbar-button"
+          title="تراجع"
+        >
+          <i class="pi pi-undo"></i>
+        </button>
+        <button
+          type="button"
+          @click="editor.chain().focus().redo().run()"
+          :disabled="!editor.can().redo()"
+          class="toolbar-button"
+          title="إعادة"
+        >
+          <i class="pi pi-replay"></i>
+        </button>
+      </div>
+    </div>
+    <div class="tiptap">
+      <editor-content :editor="editor" />
+    </div>
+
+    <!-- Image Dialog -->
+    <Dialog
+      v-model:visible="showImageDialog"
+      header="إضافة صورة"
+      :modal="true"
+      :style="{ width: '500px' }"
+    >
+      <div class="space-y-4">
+        <!-- Upload File Option -->
+        <div>
+          <label class="block text-sm font-medium mb-2">رفع صورة من الجهاز</label>
+          <FileUpload
+            mode="basic"
+            accept="image/*"
+            :maxFileSize="5242880"
+            :auto="false"
+            chooseLabel="اختر صورة"
+            @select="handleImageFileSelect"
+            class="w-full"
+          />
+          <small class="text-gray-500 block mt-1">الحد الأقصى: 5 ميجابايت</small>
+        </div>
+
+        <!-- Image Preview -->
+        <div v-if="imagePreview" class="flex justify-center">
+          <img :src="imagePreview" alt="Preview" class="max-w-full h-auto rounded-lg border border-gray-300" style="max-height: 200px;" />
+        </div>
+
+        <!-- Divider -->
+        <div v-if="imagePreview || imageUrl" class="flex items-center gap-2">
+          <div class="flex-1 border-t border-gray-300"></div>
+          <span class="text-sm text-gray-500">أو</span>
+          <div class="flex-1 border-t border-gray-300"></div>
+        </div>
+
+        <!-- URL Option -->
+        <div>
+          <label class="block text-sm font-medium mb-2">رابط الصورة</label>
+          <InputText
+            v-model="imageUrl"
+            placeholder="https://example.com/image.jpg"
+            class="w-full"
+            @input="imageFile = null; imagePreview = null"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="إلغاء"
+          severity="secondary"
+          @click="closeImageDialog"
+        />
+        <Button
+          :label="uploadingImage ? 'جاري الرفع...' : 'إضافة'"
+          @click="insertImage"
+          :loading="uploadingImage"
+          :disabled="uploadingImage || (!imageFile && !imageUrl.trim())"
+        />
+      </template>
+    </Dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onBeforeUnmount, ref } from 'vue';
+import { useEditor, EditorContent } from '@tiptap/vue-3';
+import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import { storage } from '@shared/libs/filters';
+
+const editor = useEditor({
+  content: "<p>I'm running Tiptap with Vue.js. 🎉</p>",
+  extensions: [
+    StarterKit,
+    Image.configure({
+      HTMLAttributes: {
+        class: 'max-w-full h-auto rounded-lg',
+      },
+    }),
+  ],
+});
+
+// API handler for image upload
+const { apiCall } = useApiHandler('dashboard');
+
+// Image dialog state
+const showImageDialog = ref(false);
+const imageUrl = ref('');
+const imageFile = ref<File | null>(null);
+const imagePreview = ref<string | null>(null);
+const uploadingImage = ref(false);
+
+// Image functions
+const openImageDialog = () => {
+  imageUrl.value = '';
+  imageFile.value = null;
+  imagePreview.value = null;
+  showImageDialog.value = true;
+};
+
+const handleImageFileSelect = (event: any) => {
+  const file = event.files?.[0];
+  if (file) {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('يرجى اختيار ملف صورة صالح');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الملف يجب أن يكون أقل من 5 ميجابايت');
+      return;
+    }
+
+    imageFile.value = file;
+    imageUrl.value = ''; // Clear URL when file is selected
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreview.value = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('dir', 'images/editor');
+
+  const response = await apiCall<{ path: string; url: string }>({
+    endpoint: 'editor/upload-image',
+    method: 'post',
+    payload: formData,
+    useFormData: true,
+    onError: (message) => {
+      throw new Error(message || 'فشل في رفع الصورة');
+    },
+  });
+
+  // Return the full URL
+  if (response.data?.url) {
+    return response.data.url;
+  } else if (response.data?.path) {
+    return storage(response.data.path);
+  }
+  throw new Error('لم يتم إرجاع رابط الصورة');
+};
+
+const insertImage = async () => {
+  if (!editor.value) {
+    return;
+  }
+
+  let finalImageUrl = '';
+
+  // If file is selected, upload it first
+  if (imageFile.value) {
+    try {
+      uploadingImage.value = true;
+      finalImageUrl = await uploadImage(imageFile.value);
+    } catch (error: any) {
+      alert(error.message || 'فشل في رفع الصورة');
+      uploadingImage.value = false;
+      return;
+    } finally {
+      uploadingImage.value = false;
+    }
+  } else if (imageUrl.value.trim()) {
+    finalImageUrl = imageUrl.value.trim();
+  } else {
+    return;
+  }
+
+  // Insert image into editor
+  editor.value.chain().focus().setImage({ src: finalImageUrl }).run();
+  closeImageDialog();
+};
+
+const closeImageDialog = () => {
+  showImageDialog.value = false;
+  imageUrl.value = '';
+  imageFile.value = null;
+  imagePreview.value = null;
+};
+
+onBeforeUnmount(() => {
+  if (editor.value) {
+    editor.value.destroy();
+  }
+});
+</script>

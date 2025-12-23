@@ -1,0 +1,206 @@
+<template>
+    <div class="color-config">
+        <div class="color-selector">
+            <label class="color-label">{{ c('setting.colors.select_color', 'setting') || 'اختر اللون الأساسي:' }}</label>
+            <div class="color-grid">
+                <div
+                    v-for="color in availableColors"
+                    :key="color.value"
+                    class="color-option"
+                    :class="{ active: selectedColor === color.value }"
+                    @click="changeColor(color.value)"
+                    :style="{ '--color-preview': color.primary }"
+                >
+                    <div class="color-preview" :style="{ backgroundColor: color.primary }"></div>
+                    <div class="color-info">
+                        <span class="color-name">{{ color.name }}</span>
+                        <span class="color-description">{{ color.description }}</span>
+                    </div>
+                    <i v-if="selectedColor === color.value" class="pi pi-check color-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="color-preview-section">
+            <h4 class="preview-title">{{ c('setting.colors.preview', 'setting') || 'معاينة اللون:' }}</h4>
+            <div class="preview-cards">
+                <div class="preview-card" style="background: var(--primary-500); color: var(--primary-foreground);">
+                    <i class="pi pi-palette"></i>
+                    <span>Primary 500</span>
+                </div>
+                <div class="preview-card" style="background: var(--primary-600); color: var(--primary-foreground);">
+                    <i class="pi pi-palette"></i>
+                    <span>Primary 600</span>
+                </div>
+                <div class="preview-card" style="background: var(--primary-700); color: var(--primary-foreground);">
+                    <i class="pi pi-palette"></i>
+                    <span>Primary 700</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useColorConfig } from '../composables/useColorConfig';
+import { c } from '@shared/libs/filters';
+
+defineOptions({
+    name: "ColorConfig",
+});
+
+// Use color config composable
+const { availableColors, currentColor, applyColor, getCurrentColor } = useColorConfig();
+
+// Selected color
+const selectedColor = ref(getCurrentColor());
+
+// Change color function
+const changeColor = (colorValue: string) => {
+    selectedColor.value = colorValue;
+    applyColor(colorValue);
+};
+
+// Load saved color on mount
+onMounted(() => {
+    selectedColor.value = getCurrentColor();
+    // Apply color on mount
+    applyColor(selectedColor.value);
+});
+</script>
+
+<style scoped>
+.color-config {
+    padding: 1.5rem;
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+.color-selector {
+    margin-bottom: 1.5rem;
+}
+
+.color-label {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    font-size: 0.9375rem;
+}
+
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.color-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    background: var(--card);
+}
+
+.color-option:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.color-option.active {
+    border-color: var(--primary);
+    background: var(--primary-50);
+    box-shadow: var(--shadow-md);
+}
+
+.color-preview {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius);
+    flex-shrink: 0;
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.color-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.color-name {
+    font-weight: 600;
+    color: var(--foreground);
+    font-size: 0.875rem;
+}
+
+.color-description {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.color-check {
+    color: var(--primary);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.color-preview-section {
+    padding: 1.5rem;
+    background: var(--muted);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.preview-title {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.preview-cards {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.preview-card {
+    flex: 1;
+    min-width: 120px;
+    padding: 1rem;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease;
+}
+
+.preview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.preview-card i {
+    font-size: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .color-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+

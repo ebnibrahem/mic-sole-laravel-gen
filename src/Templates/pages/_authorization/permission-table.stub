@@ -1,0 +1,391 @@
+<script setup lang="ts">
+import { c } from '@shared/libs/filters';
+import type { Permission } from '@shared/types/responses';
+import { useConfirm } from 'primevue/useconfirm';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+interface Props {
+    data: Permission[];
+    loading: boolean;
+    pagination: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
+    showActions?: boolean;
+    filters?: any;
+    sortOrder?: string | number;
+    options?: any;
+}
+
+interface Emits {
+    (e: 'permission-selected', permission: Permission): void;
+    (e: 'permission-edit', permission: Permission): void;
+    (e: 'permission-delete', permission: Permission): void;
+    (e: 'bulk-delete', permissionIds: number[]): void;
+    (e: 'refresh'): void;
+    (e: 'page-change', page: number): void;
+    (e: 'page-size-change', pageSize: number): void;
+    (e: 'sort-change', order: any): void;
+    (e: 'load-data', filters?: any): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    loading: false,
+    showActions: true,
+    filters: () => ({}),
+    sortOrder: 'desc'
+});
+
+const emit = defineEmits<Emits>();
+
+const router = useRouter();
+const confirm = useConfirm();
+
+const selectedPermissions = ref<Permission[]>([]);
+const tableRef = ref();
+// Convert sortOrder string to number for PrimeVue DataTable (1 = asc, -1 = desc)
+const sortOrder = computed(() => {
+    if (typeof props.sortOrder === 'number') {
+        return props.sortOrder;
+    }
+    if (typeof props.sortOrder === 'string') {
+        return props.sortOrder === 'asc' ? 1 : -1;
+    }
+    return -1; // default to desc
+});
+// Get sortOrder as string for comparison in template
+const sortOrderString = computed(() => {
+    if (typeof props.sortOrder === 'string') {
+        return props.sortOrder;
+    }
+    if (typeof props.sortOrder === 'number') {
+        return props.sortOrder === 1 ? 'asc' : 'desc';
+    }
+    // Default to 'desc' if sortOrder is undefined
+    return 'desc';
+});
+
+// معالجة اختيار صلاحية
+const handleRowSelect = (permission: Permission) => {
+    emit('permission-selected', permission);
+};
+
+// معالجة تعديل صلاحية
+const handleEdit = (permission: Permission) => {
+    emit('permission-edit', permission);
+};
+
+// معالجة حذف صلاحية
+const handleDelete = (permission: Permission) => {
+    confirm.require({
+        message: c('common.delete', 'common') + ' ' + (permission.title || permission.name),
+        header: c('common.delete_confirm', 'common'),
+        icon: 'pi pi-exclamation-triangle',
+        rejectLabel: c('common.cancel', 'common'),
+        acceptLabel: c('common.delete', 'common'),
+        accept: () => {
+            emit('permission-delete', permission);
+        },
+    });
+};
+
+// معالجة الحذف المتعدد
+const handleBulkDelete = () => {
+    const permissionIds = selectedPermissions.value.map((permission) => permission.id);
+    confirm.require({
+        message: c('common.delete_selected', 'common') + ' (' + selectedPermissions.value.length + ') ' + c('permission.plural', 'permission'),
+        header: c('common.delete_confirm', 'common'),
+        icon: 'pi pi-exclamation-triangle',
+        rejectLabel: c('common.cancel', 'common'),
+        acceptLabel: c('common.delete', 'common'),
+        accept: () => {
+            emit('bulk-delete', permissionIds);
+        },
+    });
+};
+
+// معالجة تغيير الصفحة
+const handlePageChange = (event: any) => {
+    emit('load-data', { page: event.page + 1 });
+};
+
+// معالجة تغيير عدد السجلات في الصفحة
+const handlePageSizeChange = (event: any) => {
+    emit('load-data', { per_page: event.value, page: 1 });
+};
+
+// معالجة الترتيب
+const handleSort = (order: any) => {
+    emit('load-data', { sort_order: order });
+};
+
+// معالجة التحديث
+const handleRefresh = () => {
+    emit('load-data');
+};
+
+// استخراج نوع الصلاحية من الاسم
+const getPermissionType = (name: string | undefined | null) => {
+    if (!name || typeof name !== 'string') {
+        return 'عام';
+    }
+    const parts = name.split('_');
+    return parts[0] || 'عام';
+};
+
+// استخراج العملية من الاسم
+const getPermissionAction = (name: string | undefined | null) => {
+    if (!name || typeof name !== 'string') {
+        return 'عام';
+    }
+    const parts = name.split('_');
+    return parts[1] || 'عام';
+};
+</script>
+
+<template>
+    <div class="rounded-lg bg-white shadow-md">
+        <!-- Header -->
+        <div class="border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold">{{ c('permission.list_title', 'permission') }}</h3>
+                <div class="flex gap-2">
+                    <ExportAsPdf
+                        :options="{
+                            fileName: 'permissions-report',
+                            fileHeader: c('permission.list_title', 'permission'),
+                            dt: tableRef,
+                            rtl: true,
+                        }"
+                    />
+                    <ExportAsImage
+                        :options="{
+                            fileName: 'permissions-report',
+                            dt: tableRef,
+                        }"
+                    />
+                    <ExportAsExcel
+                        :options="{
+                            fileName: 'permissions-report',
+                            data: data,
+                            headers: [
+                                { key: 'id', label: 'ID', type: 'number' },
+                                { key: 'title', label: c('permission.fields.title', 'permission'), type: 'text' },
+                                { key: 'name', label: c('permission.fields.name', 'permission'), type: 'text' },
+                                { key: 'roles_count', label: c('permission.fields.roles_count', 'permission'), type: 'number' },
+                                { key: 'created_at', label: c('permission.fields.created_at', 'permission'), type: 'date' },
+                            ],
+                        }"
+                    />
+                    <AppButton
+                        v-if="selectedPermissions.length > 0"
+                        icon="pi pi-trash"
+                        severity="danger"
+                        outlined
+                        size="small"
+                        :label="c('common.bulk_delete', 'common') + ' (' + selectedPermissions.length + ')'"
+                        permissions="permission_delete"
+                        @click="handleBulkDelete"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Controls -->
+        <div class="bg-white border-b border-gray-200 px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ c('permission.plural', 'permission') }}</h3>
+                    <div class="flex items-center gap-2">
+                        <AppButton
+                            icon="pi pi-sort-amount-up"
+                            :severity="sortOrderString === 'asc' ? 'primary' : 'secondary'"
+                            text
+                            size="small"
+                            @click="handleSort('asc')"
+                             v-tooltip.top="'ترتيب تصاعدي'"
+                        />
+                        <AppButton
+                            icon="pi pi-sort-amount-down"
+                            :severity="sortOrderString === 'desc' ? 'primary' : 'secondary'"
+                            text text-primary
+                            size="small"
+                            @click="handleSort('desc')"
+                            v-tooltip.top="'ترتيب تنازلي'"
+                        />
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <AppButton
+                        icon="pi pi-refresh"
+                        severity="info"
+                        text
+                        size="small"
+                        @click="handleRefresh"
+                        :loading="loading"
+                        v-tooltip.top="'إعادة التحميل'"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <DataTable
+            ref="tableRef"
+            :value="data"
+            :loading="loading"
+            v-model:selection="selectedPermissions"
+            selectionMode="multiple"
+            dataKey="id"
+            size="small"
+            stripedRows
+            showGridlines
+            :tableStyle="{ minWidth: '50rem' }"
+            class="p-datatable-sm"
+        >
+            <!-- Selection Column -->
+            <Column selectionMode="multiple" headerStyle="width: 3rem" bodyStyle="text-align: center"></Column>
+
+            <!-- ID Column -->
+            <Column field="id" header="#" :sortable="true" style="width: 80px" bodyStyle="text-align: center">
+                <template #body="{ data }">
+                    <span class="font-mono text-sm">{{ data.id }}</span>
+                </template>
+            </Column>
+
+            <!-- Title Column -->
+            <Column field="title" :header="c('permission.fields.title', 'permission')" :sortable="true" style="min-width: 250px">
+                <template #body="{ data }">
+                    <AppButton
+                        text
+                        severity="info"
+                        class="p-0 h-auto font-semibold text-left justify-start hover:underline hover:text-blue-600"
+                        @click="handleRowSelect(data)"
+                     >
+                        {{ data?.title }}
+                    </AppButton>
+                </template>
+            </Column>
+
+            <!-- Name Column -->
+            <Column field="name" :header="c('permission.fields.name', 'permission')" :sortable="true" style="min-width: 250px">
+                <template #body="{ data }">
+                    <div class="space-y-2">
+                        <span class="font-mono text-sm text-gray-700">{{ data.name }}</span>
+                        <div class="flex items-center gap-2">
+                            <Tag :value="getPermissionType(data.name)" severity="info" class="text-xs" />
+                            <Tag :value="getPermissionAction(data.name)" severity="success" class="text-xs" />
+                        </div>
+                    </div>
+                </template>
+            </Column>
+
+            <!-- Roles Count Column -->
+            <Column field="roles_count" :header="c('permission.fields.roles_count', 'permission')" :sortable="true" style="width: 120px" bodyStyle="text-align: center">
+                <template #body="{ data }">
+                    <div class="flex items-center justify-center gap-2">
+                        <i class="pi pi-shield text-blue-500"></i>
+                        <span class="font-semibold text-blue-600">{{ data.roles_count || 0 }}</span>
+                    </div>
+                </template>
+            </Column>
+
+            <!-- Created At Column -->
+            <Column field="created_at" :header="c('permission.fields.created_at', 'permission')" :sortable="true" style="width: 150px">
+                <template #body="{ data }">
+                    <DateFormat :date="data.created_at" />
+                </template>
+            </Column>
+
+            <!-- Actions Column -->
+            <Column :header="c('common.actions', 'common')" :exportable="false" style="width: 150px" bodyStyle="text-align: center">
+                <template #body="{ data }">
+                    <div class="flex gap-1 justify-center">
+                        <AppButton
+                            icon="pi pi-eye"
+                            severity="info"
+                            text
+                            rounded
+                            size="small"
+                            @click="handleRowSelect(data)"
+                            v-tooltip.top="c('common.view', 'common')"
+                            permissions="permission_view"
+                            class="hover:bg-blue-50"
+                        />
+                        <AppButton
+                            icon="pi pi-pencil"
+                            severity="warning"
+                            text
+                            rounded
+                            size="small"
+                            @click="handleEdit(data)"
+                            v-tooltip.top="c('common.edit', 'common')"
+                            permissions="permission_edit"
+                            class="hover:bg-yellow-50"
+                        />
+                        <AppButton
+                            icon="pi pi-trash"
+                            severity="danger"
+                            text
+                            rounded
+                            size="small"
+                            @click="handleDelete(data)"
+                            v-tooltip.top="c('common.delete', 'common')"
+                            permissions="permission_delete"
+                            class="hover:bg-red-50"
+                        />
+                    </div>
+                </template>
+            </Column>
+        </DataTable>
+
+        <!-- Empty State -->
+        <div v-if="!loading && data.length === 0" class="p-12 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <i class="pi pi-key mb-6 text-6xl text-gray-300"></i>
+            <h3 class="mb-3 text-xl font-semibold text-gray-700">{{ c('permission.no_permissions', 'permission') }}</h3>
+            <p class="mb-6 text-gray-500 max-w-md mx-auto">{{ c('permission.no_permissions_message', 'permission') }}</p>
+        </div>
+
+        <!-- Paginator -->
+        <div class="mt-6 flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center gap-4">
+                <label class="text-sm font-medium text-gray-700">{{ c('common.per_page', 'common') }}:</label>
+                <Select
+                    :modelValue="pagination.per_page"
+                    :options="[5, 10, 20, 50, 100]"
+                    @change="handlePageSizeChange"
+                    class="w-25"
+                    size="small"
+                />
+            </div>
+
+            <div class="flex flex-col items-center gap-3">
+                <span class="text-sm text-gray-600 font-medium">
+                    {{ pagination.from || 0 }} - {{ pagination.to || 0 }} {{ c('common.records', 'common') }} - {{ pagination.current_page }}/{{ pagination.last_page }} {{ c('common.pages', 'common') }}
+                </span>
+
+                <Paginator
+                    :first="(pagination.current_page - 1) * pagination.per_page"
+                    :rows="pagination.per_page"
+                    :totalRecords="pagination.total"
+                    @page="handlePageChange"
+                    template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+                    class="p-paginator-sm"
+                />
+            </div>
+        </div>
+    </div>
+</template>
+
+<script lang="ts">
+export default {
+    name: 'PermissionTable'
+};
+</script>
+

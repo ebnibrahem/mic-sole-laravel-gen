@@ -1,0 +1,242 @@
+@php
+    $application = \App\Models\Application::first() ?? null;
+    // Logo is always at /images/logo.png (fixed path)
+    $logo = '/images/logo.png';
+    // Favicon is always at /favicon.ico (fixed path in public root)
+    $favicon = '/favicon.ico';
+    $bearer = request()->bearerToken() ?? session('bearer_token') ?? null;
+    $auth = auth()->user();
+
+    // Get unread notifications count
+    $unreadNotificationsCount = 0;
+    $notifications = [];
+
+    if ($auth) {
+        try {
+            // Check if notifications table exists
+            if (\Schema::hasTable('notifications')) {
+                $unreadNotificationsCount = $auth->unreadNotifications()->count();
+
+                // Get initial notifications (limit 4 for dropdown)
+                $notifications = $auth->notifications()
+                    ->orderBy('created_at', 'desc')
+                    ->limit(4)
+                    ->get()
+                    ->map(function ($notification) {
+                        return [
+                            'id' => $notification->id,
+                            'type' => $notification->type,
+                            'data' => $notification->data,
+                            'read_at' => $notification->read_at?->toIso8601String(),
+                            'created_at' => $notification->created_at->toIso8601String(),
+                        ];
+                    })
+                    ->toArray();
+            }
+        } catch (\Exception $e) {
+            // If notifications table doesn't exist or any error, use empty values
+            $unreadNotificationsCount = 0;
+            $notifications = [];
+        }
+    }
+
+    // Settings to pass to Vue (cached data)
+    $settings = [
+        'notifications' => $notifications,
+        'unread_notifications_count' => $unreadNotificationsCount,
+    ];
+
+    // Dropdowns data (cached static data)
+    $dropdowns = [];
+    // Add your dropdowns here, e.g.:
+    // $dropdowns = [
+    //     'status_options' => [
+    //         ['value' => true, 'label' => 'نشط'],
+    //         ['value' => false, 'label' => 'غير نشط'],
+    //     ],
+    // ];
+
+    // Load translations from Laravel lang files
+    // Option 1: Load all language files (recommended for small apps)
+    $translations = [];
+    // Force dashboard locale to Arabic (can be customized later)
+    $locale = 'ar';
+    $fallbackLocale = config('app.fallback_locale', 'en');
+
+    // Load common translations
+    $commonPath = resource_path("lang/{$locale}/common.php");
+    $fallbackPath = resource_path("lang/{$fallbackLocale}/common.php");
+
+    if (file_exists($commonPath)) {
+        $translations['common'] = require $commonPath;
+    } elseif (file_exists($fallbackPath)) {
+        $translations['common'] = require $fallbackPath;
+    }
+
+    // Ensure translations is always an array (even if empty)
+    if (!isset($translations['common']) || empty($translations['common'])) {
+        $translations['common'] = [];
+        // Try to load from default ar locale if current locale failed
+        $defaultPath = resource_path("lang/ar/common.php");
+        if (file_exists($defaultPath)) {
+            $translations['common'] = require $defaultPath;
+        }
+    }
+
+    // Load auth translations
+    $authPath = resource_path("lang/{$locale}/auth.php");
+    $authFallbackPath = resource_path("lang/{$fallbackLocale}/auth.php");
+
+    if (file_exists($authPath)) {
+        $translations['auth'] = require $authPath;
+    } elseif (file_exists($authFallbackPath)) {
+        $translations['auth'] = require $authFallbackPath;
+    }
+
+    // Ensure auth translations is always an array (even if empty)
+    if (!isset($translations['auth']) || empty($translations['auth'])) {
+        $translations['auth'] = [];
+        // Try to load from default ar locale if current locale failed
+        $defaultAuthPath = resource_path("lang/ar/auth.php");
+        if (file_exists($defaultAuthPath)) {
+            $translations['auth'] = require $defaultAuthPath;
+        }
+    }
+
+    // Load model-specific translations (user, role, permission, setting, profile, and dynamically generated models)
+    // Supports both shapes:
+    // return ['plural' => 'مستخدمين', ...];
+    // return ['user' => ['plural' => 'مستخدمين', ...]];
+
+    // Get all PHP files from lang directory (excluding common.php and auth.php which are loaded separately)
+    $langDir = resource_path("lang/{$locale}");
+    $modelFiles = ['user', 'role', 'permission', 'setting', 'profile'];
+
+    // Dynamically load all other translation files
+    if (is_dir($langDir)) {
+        $files = glob($langDir . '/*.php');
+        foreach ($files as $file) {
+            $model = basename($file, '.php');
+            // Skip common and auth (already loaded) and files already in modelFiles
+            if (!in_array($model, ['common', 'auth']) && !in_array($model, $modelFiles)) {
+                $modelFiles[] = $model;
+            }
+        }
+    }
+
+    foreach ($modelFiles as $model) {
+        $modelPath = resource_path("lang/{$locale}/{$model}.php");
+        $modelFallbackPath = resource_path("lang/{$fallbackLocale}/{$model}.php");
+
+        $data = null;
+        if (file_exists($modelPath)) {
+            $data = require $modelPath;
+        } elseif (file_exists($modelFallbackPath)) {
+            $data = require $modelFallbackPath;
+        } else {
+            // Try to load from default ar locale if current locale failed
+            $defaultModelPath = resource_path("lang/ar/{$model}.php");
+            if (file_exists($defaultModelPath)) {
+                $data = require $defaultModelPath;
+            }
+        }
+
+        if (is_array($data)) {
+            // If file is wrapped like ['user' => [...]], unwrap it
+            if (array_key_exists($model, $data) && is_array($data[$model])) {
+                $translations[$model] = $data[$model];
+            } else {
+                $translations[$model] = $data;
+            }
+        }
+    }
+
+    // Option 2: Use Laravel's lang:json command output (if using Laravel 10+)
+    // $translationsJsonPath = resource_path("lang/{$locale}.json");
+    // if (file_exists($translationsJsonPath)) {
+    //     $translations = json_decode(file_get_contents($translationsJsonPath), true);
+    // }
+@endphp
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{{ config('app.name') }} - لوحة التحكم</title>
+
+    <link rel="icon" href="{{ $favicon }}" sizes="any">
+    <link rel="icon" href="{{ $favicon }}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{{ $logo }}">
+
+    {{-- Google Fonts - Arabic Fonts --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    {{-- PrimeIcons --}}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/primeicons@latest/primeicons.css">
+
+    @vite(['resources/css/dashboard.css', 'resources/ts/dashboard.ts'])
+
+    {{-- Force cache refresh --}}
+    <script>
+        window.CACHE_VERSION = '{{ now()->timestamp }}';
+    </script>
+</head>
+<body>
+    <div
+        id="dashboard-app"
+        data-props="{{ json_encode([
+            'bearer' => $bearer,
+            'auth' => $auth ? [
+                'id' => $auth->id,
+                'name' => $auth->name,
+                'username' => $auth->username,
+                'email' => $auth->email,
+                'phone' => $auth->phone,
+                'image' => $auth->image,
+                'roles' => $auth->roles->map(function($role) {
+                    return [
+                        'id' => $role->id,
+                        'title' => $role->title,
+                        'permissions' => $role->permissions->map(function($permission) {
+                            return [
+                                'id' => $permission->id,
+                                'title' => $permission->title,
+                                'name' => $permission->name,
+                            ];
+                        })->toArray(),
+                    ];
+                })->toArray(),
+            ] : null,
+            'application' => $application ? [
+                'id' => $application->id,
+                'name' => $application->name,
+                'alias' => $application->alias,
+                'notes' => $application->notes,
+                'description' => $application->description,
+                'email' => $application->email,
+                'phone' => $application->phone,
+                'address' => $application->address,
+                'logo' => '/images/logo.png', // Fixed path, not from DB (starts with /)
+                'favicon' => '/favicon.ico', // Fixed path, not from DB (starts with /)
+                'status' => $application->is_active,
+                'is_active' => $application->is_active,
+            ] : null,
+            'settings' => $settings ?? [],
+            'dropdowns' => $dropdowns ?? [],
+            'translations' => $translations ?? [],
+            'locale' => $locale ?? 'ar',
+            'fallback_locale' => $fallbackLocale ?? 'en',
+        ], JSON_UNESCAPED_UNICODE) }}"
+    ></div>
+</body>
+</html>
+

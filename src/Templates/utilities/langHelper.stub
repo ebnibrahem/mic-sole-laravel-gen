@@ -1,0 +1,274 @@
+/**
+ * Translation Helper for Vue components
+ * Supports Laravel language files structure
+ *
+ * @module utilities/langHelper
+ */
+
+// Mock Lang class - يجب استبدالها بمكتبة i18n حقيقية
+class Lang {
+    private messages: Record<string, any>;
+    private locale: string;
+    private fallback: string;
+
+    constructor(config: { messages: Record<string, any>; locale: string; fallback: string }) {
+        this.messages = config.messages;
+        this.locale = config.locale;
+        this.fallback = config.fallback;
+    }
+
+    get(key: string): string {
+        // 1) محاولة الوصول المباشر إذا كان المفتاح موجوداً كما هو
+        if (key in this.messages) {
+            const directValue = this.messages[key];
+            if (typeof directValue === 'string') {
+                return directValue;
+            }
+        }
+
+        const keys = key.split('.');
+
+        // 2) دعم المفاتيح المسطحة داخل ملف ترجمة واحد مثل:
+        //    common['authorization.title'] مع مفتاح كامل 'common.authorization.title'
+        if (keys.length > 1) {
+            const topLevel = keys[0];
+            const rest = keys.slice(1).join('.');
+
+            if (
+                this.messages &&
+                typeof this.messages === 'object' &&
+                topLevel in this.messages &&
+                this.messages[topLevel] &&
+                typeof this.messages[topLevel] === 'object'
+            ) {
+                // محاولة 1: البحث عن مفتاح مسطح (مثل common['authorization.title'])
+                if (rest in this.messages[topLevel]) {
+                    const flatValue = this.messages[topLevel][rest];
+                    if (typeof flatValue === 'string') {
+                        return flatValue;
+                    }
+                }
+
+                // محاولة 2: البحث عن مفتاح متداخل (مثل user['user']['plural'])
+                const restKeys = rest.split('.');
+                let nestedValue: any = this.messages[topLevel];
+                let found = true;
+                for (const k of restKeys) {
+                    if (nestedValue && typeof nestedValue === 'object' && k in nestedValue) {
+                        nestedValue = nestedValue[k];
+                    } else {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found && typeof nestedValue === 'string') {
+                    return nestedValue;
+                }
+            }
+        }
+
+        // 3) fallback للسلوك المتداخل الافتراضي (user.messages.deleted إلخ)
+        let value: any = this.messages;
+        for (const k of keys) {
+            if (value && typeof value === 'object' && k in value) {
+                value = value[k];
+            } else {
+                // لا نطبع warning هنا لأننا قد نحاول طرق أخرى
+                break;
+            }
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        // إذا لم نجد الترجمة، نطبع warning ونرجع المفتاح
+        console.warn(`Translation key not found: ${key}`);
+        return key;
+    }
+}
+
+// Mock messages - يجب تحميلها من Laravel API أو ملفات JSON
+// في التطبيق الحقيقي، سيتم تحميل هذه الرسائل من Laravel
+let ll_messages: Record<string, any> = {};
+let default_locale = 'ar';
+let fallback_locale = 'en';
+
+/**
+ * Initialize translation messages
+ * يجب استدعاء هذه الدالة عند تحميل التطبيق
+ *
+ * @param messages - Translation messages object
+ * @param locale - Default locale (default: 'ar')
+ * @param fallback - Fallback locale (default: 'en')
+ */
+export function initTranslations(messages: Record<string, any>, locale = 'ar', fallback = 'en') {
+    ll_messages = messages;
+    default_locale = locale;
+    fallback_locale = fallback;
+    // Debug: log translations structure
+    if (import.meta.env.DEV) {
+        // console.log('Translations loaded:', Object.keys(messages));
+        if (messages.common) {
+            // console.log('Common translations:', Object.keys(messages.common));
+            if (messages.common.auth) {
+                // console.log('Auth translations:', Object.keys(messages.common.auth));
+            }
+        }
+    }
+}
+
+/**
+ * Get translation value
+ *
+ * @param key - Translation key (string or array of keys)
+ * @param dir - Default directory/file name (optional)
+ * @param options - Options object with separator and log
+ * @returns Translated string
+ *
+ * @example
+ * c('common.enter', 'common') // "ادخل"
+ * c(['common.enter', 'post.name']) // "ادخل اسم المنشور"
+ * c(['common.enter', 'post.name'], undefined, { separator: ' - ' }) // "ادخل - اسم المنشور"
+ */
+export function c(
+    key: string | string[],
+    dir?: string,
+    options: { separator?: string; log?: boolean } = {}
+): string {
+    const { separator = ' ', log = false } = options;
+
+    const lang = new Lang({
+        messages: ll_messages,
+        locale: default_locale,
+        fallback: fallback_locale,
+    });
+
+    // إذا كان key مصفوفة، اربطها بفاصل
+    if (Array.isArray(key)) {
+        const translations = key.map(k => {
+            // إذا كان dir محدد، استخدمه كـ dir الأساسي
+            // إذا كان key يحتوي على . (مثل post.name)، استخدم الجزء الأول كـ dir فقط إذا لم يكن dir محدد
+            let keyDir = dir;
+            let keyPath = k;
+
+            if (k.includes('.')) {
+                const parts = k.split('.');
+                // إذا كان dir محدد، استخدمه كـ dir الأساسي وkey كاملاً كـ path
+                if (dir) {
+                    keyDir = dir;
+                    keyPath = k; // استخدم key كاملاً (مثل auth.login_title)
+                } else {
+                    // إذا لم يكن dir محدد، استخدم الجزء الأول من key كـ dir
+                    keyDir = parts[0];
+                    keyPath = parts.slice(1).join('.');
+                }
+            }
+
+            if (log) {
+                console.log(`[c] ${keyDir}.${keyPath}`);
+            }
+
+            // إذا كان keyDir غير محدد، استخدم dir الافتراضي
+            const fullKey = keyDir ? `${keyDir}.${keyPath}` : keyPath;
+            return lang.get(fullKey);
+        });
+        return translations.join(separator);
+    }
+
+    // إذا كان key string عادي
+    // إذا كان dir محدد، استخدمه كـ dir الأساسي
+    // إذا كان key يحتوي على . (مثل common.enter)، استخدم الجزء الأول كـ dir فقط إذا لم يكن dir محدد
+    let keyDir = dir;
+    let keyPath = key;
+
+    if (key.includes('.')) {
+        const parts = key.split('.');
+        // إذا كان dir محدد، استخدمه كـ dir الأساسي
+        if (dir) {
+            // إذا كان dir يطابق الجزء الأول من key، استخدم الأجزاء المتبقية فقط
+            if (parts[0] === dir) {
+                keyDir = dir;
+                keyPath = parts.slice(1).join('.');
+            } else {
+                // إذا كان dir مختلف، استخدم key كاملاً كـ path مسطح داخل dir
+                // مثال: c('authorization.title', 'common') → common['authorization.title']
+                keyDir = dir;
+                keyPath = key; // استخدم key كاملاً كـ path مسطح
+            }
+        } else {
+            // إذا لم يكن dir محدد، استخدم الجزء الأول من key كـ dir
+            keyDir = parts[0];
+            keyPath = parts.slice(1).join('.');
+        }
+    } else {
+        // إذا كان key بدون . و dir محدد، استخدم dir[key]
+        // مثال: c('plural', 'user') → user['plural']
+        if (dir) {
+            keyDir = dir;
+            keyPath = key;
+        }
+    }
+
+    if (log) {
+        console.log(`[c] ${keyDir || 'default'}.${keyPath}`);
+    }
+
+    const fullKey = keyDir ? `${keyDir}.${keyPath}` : keyPath;
+    const result = lang.get(fullKey);
+
+    // Debug in development
+    if (import.meta.env.DEV && result === fullKey) {
+        console.warn(`Translation not found for: ${fullKey}`, {
+            availableKeys: Object.keys(ll_messages),
+            keyDir,
+            keyPath,
+            fullKey
+        });
+    }
+
+    return result;
+}
+
+/**
+ * Get translation with placeholder replacement
+ *
+ * @param key - Translation key
+ * @param replacements - Object with placeholder replacements or string for single __ placeholder
+ * @param dir - Directory/file name
+ * @returns Translated string with replacements
+ *
+ * @example
+ * lang('common.messages.created', 'post.singular', 'common') // "تم إنشاء المنشور بنجاح"
+ * lang('common.messages.created', { __: 'post.singular' }, 'common')
+ */
+export function lang(
+    key: string,
+    replacements?: string | Record<string, string>,
+    dir?: string
+): string {
+    let translation = c(key, dir);
+
+    if (!replacements) {
+        return translation;
+    }
+
+    // إذا كان replacements string، استخدمه كبديل لـ __
+    if (typeof replacements === 'string') {
+        const replacementValue = c(replacements, dir);
+        return translation.replace(/__/g, replacementValue);
+    }
+
+    // إذا كان replacements object، استبدل جميع المفاتيح
+    let result = translation;
+    for (const [placeholder, value] of Object.entries(replacements)) {
+        const replacementValue = typeof value === 'string' && value.includes('.')
+            ? c(value, dir)
+            : value;
+        result = result.replace(new RegExp(placeholder, 'g'), replacementValue);
+    }
+
+    return result;
+}
+
+

@@ -1,0 +1,178 @@
+<script lang="ts" setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@shared/stores/auth_store';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import { useToast } from 'primevue/usetoast';
+import { c } from '@dashboard/utilities/langHelper';
+
+const router = useRouter();
+const authStore = useAuthStore();
+const toast = useToast();
+// Use 'auth' base for auth endpoints (they're at /api/auth, not /api/v1/auth)
+const { apiCall } = useApiHandler('auth');
+
+const form = ref({
+    login: '',
+    password: '',
+    remember: false,
+});
+
+const loading = ref(false);
+const errors = ref<Record<string, string>>({});
+
+// Auto-fill test credentials
+const fillTestCredentials = () => {
+    form.value.login = 'admin@example.com';
+    form.value.password = 'password';
+    form.value.remember = false;
+    errors.value = {};
+};
+
+const handleLogin = async () => {
+    loading.value = true;
+    errors.value = {};
+
+    const result = await apiCall({
+        endpoint: 'auth/login',
+        method: 'post',
+        payload: form.value,
+        onSuccess: (data: any) => {
+            toast.add({
+                severity: 'success',
+                summary: c('auth.login_success', 'common') || 'نجاح',
+                detail: c('auth.login_success_message', 'common') || 'تم تسجيل الدخول بنجاح',
+                life: 3000,
+            });
+
+            // Update auth store with user and token
+            if (data.user) {
+                authStore.setUser(data.user);
+            }
+            if (data.token) {
+                authStore.setToken(data.token);
+            }
+            // Ensure isAuthenticated is set
+            authStore.isAuthenticated = true;
+
+            // Redirect to dashboard using Vue Router (no page reload)
+            router.push('/dashboard');
+        },
+        onError: (message: string, code?: string | number, validationErrors?: Record<string, string>) => {
+            if (validationErrors) {
+                errors.value = validationErrors;
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: c('auth.login_failed', 'common') || 'خطأ',
+                    detail: message,
+                    life: 3000,
+                });
+            }
+        },
+    });
+
+    loading.value = false;
+};
+</script>
+
+<template>
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                    {{ c('auth.login_title', 'common') || 'تسجيل الدخول' }}
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                    {{ c('auth.login_subtitle', 'common') || 'أدخل بياناتك للدخول إلى لوحة التحكم' }}
+                </p>
+            </div>
+            <form class="mt-8 space-y-6" @submit.prevent="handleLogin">
+                <div class="space-y-4">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.email_or_username_or_phone', 'auth') || 'البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف' }}
+                        </label>
+                        <InputText
+                            id="login"
+                            v-model="form.login"
+                            type="text"
+                            :placeholder="c('auth.email_or_username_or_phone_placeholder', 'auth') || 'أدخل البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.email || errors.login }"
+                            required
+                        />
+                        <small v-if="errors.email || errors.login" class="p-error">{{ errors.email || errors.login }}</small>
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {{ c('auth.password', 'common') || 'كلمة المرور' }}
+                        </label>
+                        <Password
+                            id="password"
+                            v-model="form.password"
+                            :placeholder="c('auth.password_placeholder', 'common') || 'أدخل كلمة المرور'"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.password }"
+                            toggleMask
+                            required
+                        />
+                        <small v-if="errors.password" class="p-error">{{ errors.password }}</small>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <Checkbox
+                                id="remember"
+                                v-model="form.remember"
+                                :binary="true"
+                            />
+                            <label for="remember" class="mr-2 text-sm text-gray-600 dark:text-gray-400">
+                                {{ c('auth.remember_me', 'common') || 'تذكرني' }}
+                            </label>
+                        </div>
+                        <router-link
+                            to="/forgot-password"
+                            class="text-sm font-medium text-primary hover:text-primary-dark"
+                        >
+                            {{ c('auth.forgot_password', 'common') || 'نسيت كلمة المرور؟' }}
+                        </router-link>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <Button
+                        type="submit"
+                        :label="c('auth.login_button', 'common') || 'تسجيل الدخول'"
+                        class="w-full"
+                        :loading="loading"
+                    />
+                    <Button
+                        type="button"
+                        label="تعبئة تلقائية"
+                        icon="pi pi-magic"
+                        severity="secondary"
+                        outlined
+                        class="w-full"
+                        @click="fillTestCredentials"
+                    />
+                </div>
+
+                <div class="text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        {{ c('auth.need_help', 'common') || 'تحتاج مساعدة؟' }}
+                    </p>
+                    <router-link
+                        to="/authorization/users/do/create"
+                        class="text-sm font-medium text-primary hover:text-primary-dark inline-flex items-center gap-1"
+                    >
+                        <i class="pi pi-user-plus text-xs"></i>
+                        {{ c('auth.add_user', 'common') || 'إضافة مستخدم جديد' }}
+                    </router-link>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>
+

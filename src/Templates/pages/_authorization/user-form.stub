@@ -1,0 +1,638 @@
+<script setup lang="ts">
+import { c, avatar, storage } from '@shared/libs/filters';
+import type { User } from '@shared/types/responses';
+import { useToast } from 'primevue/usetoast';
+import { computed, ref, watch } from 'vue';
+// لا نحتاج apiHandler - الاعتماد على البيانات من الأب فقط
+
+interface Props {
+    user?: User | null;
+    loading?: boolean;
+    isEdit?: boolean;
+    roleOptions?: Array<{label: string, value: number}>;
+    addAnother?: boolean;
+}
+
+interface Emits {
+    (e: 'submit', data: any, callbacks?: { onSuccess: () => void; onError: () => void }): void;
+    (e: 'cancel'): void;
+    (e: 'saved', user: User): void;
+    (e: 'error', error: any): void;
+    (e: 'reset'): void;
+    (e: 'go-to-list'): void;
+}
+
+// Expose reset method
+defineExpose({
+    resetForm: () => {
+        localUser.value = {
+            name: '',
+            username: '',
+            email: '',
+            phone: null,
+            password: '',
+            clan: 'user',
+            bio: '',
+            address: '',
+            is_active: true,
+            roles: []
+        };
+        imagePreview.value = null;
+        imageFile.value = null;
+        deleteImage.value = false;
+        errors.value = {};
+        submitted.value = false;
+    }
+});
+
+const props = withDefaults(defineProps<Props>(), {
+    user: null,
+    loading: false,
+    isEdit: false,
+    roleOptions: () => [],
+    addAnother: false
+});
+
+const goToListAfterAction = ref(false);
+const sendCredentials = ref(false);
+const addAnother = ref(false);
+
+const emit = defineEmits<Emits>();
+const toast = useToast();
+// لا نحتاج apiCall هنا - الاعتماد على البيانات من الأب فقط
+
+// لا نحتاج watch props.loading - النموذج يدير loading الخاص به
+
+// Form data
+const localUser = ref({
+    name: '',
+    username: '',
+    email: '',
+    phone: null as string | null,
+    password: '',
+    clan: 'user', // Default to admin user for authorization page
+    bio: '',
+    address: '',
+    is_active: true,
+    roles: [] as number[]
+});
+
+const errors = ref<Record<string, string>>({});
+const internalLoading = ref(false);
+const imageFile = ref<File | null>(null);
+const imagePreview = ref<string | null>(null);
+const deleteImage = ref(false);
+const submitted = ref(false); // Track if form has been submitted
+
+// Watch for user prop changes
+watch(() => props.user, (newUser) => {
+    submitted.value = false; // Reset submitted state
+    errors.value = {}; // Clear errors
+    if (newUser) {
+        localUser.value = {
+            name: newUser.name || '',
+            username: newUser.username || '',
+            email: newUser.email || '',
+            phone: newUser.phone ? String(newUser.phone).replace(/,/g, '') : null,
+            password: '',
+            clan: newUser.clan || 'user',
+            bio: newUser.bio || '',
+            address: newUser.address || '',
+            is_active: newUser.is_active ?? true,
+            roles: newUser.roles?.map(role => typeof role === 'object' ? role.id : role).filter((id, index, self) => self.indexOf(id) === index) || []
+        };
+        // Set image preview if user has image
+        if (newUser.image) {
+            imagePreview.value = storage(newUser.image) || null;
+        } else {
+            imagePreview.value = null;
+        }
+        imageFile.value = null;
+        deleteImage.value = false;
+    } else {
+        // Reset form when user is null (for create mode)
+        localUser.value = {
+            name: '',
+            username: '',
+            email: '',
+            phone: null,
+            password: '',
+            clan: 'user',
+            bio: '',
+            address: '',
+            is_active: true,
+            roles: []
+        };
+        imagePreview.value = null;
+        imageFile.value = null;
+        deleteImage.value = false;
+    }
+}, { immediate: true });
+
+// Watch clan changes to clear roles if customer is selected
+watch(() => localUser.value.clan, (newClan) => {
+    if (newClan === 'customer') {
+        localUser.value.roles = [];
+    }
+});
+
+// Clan options
+const clanOptions = [
+    { label: c('user.clan.user', 'user'), value: 'user' },
+    { label: c('user.clan.customer', 'user'), value: 'customer' }
+];
+
+// Role options from props or local
+const roleOptions = computed(() => props.roleOptions || []);
+
+// Form validation
+const isFormValid = computed(() => {
+    // في وضع التعديل، كلمة المرور اختيارية (يمكن تغييرها بدون طلب الكلمة الحالية)
+    return localUser.value.name.trim() !== '' &&
+           localUser.value.email.trim() !== '';
+});
+
+// Submit form
+const handleSubmit = async () => {
+    if (!isFormValid.value) {
+        toast.add({
+            severity: 'warn',
+            summary: c('common.warning', 'common'),
+            detail: c('common.fill_required_fields', 'common'),
+            life: 3000,
+        });
+        return;
+    }
+
+    // Prevent double submission
+    if (internalLoading.value) {
+        return;
+    }
+
+    internalLoading.value = true;
+    errors.value = {};
+    submitted.value = true; // Mark form as submitted
+
+    // Create FormData for file upload
+    const formData = new FormData();
+
+    // Required fields - always append even if empty to ensure they're sent
+    const name = localUser.value.name.trim();
+    const email = localUser.value.email.trim();
+
+    if (!name || !email) {
+        toast.add({
+            severity: 'warn',
+            summary: c('common.warning', 'common'),
+            detail: c('common.fill_required_fields', 'common'),
+            life: 3000,
+        });
+        internalLoading.value = false;
+        return;
+    }
+
+    formData.append('name', name);
+    formData.append('email', email);
+
+    // Optional fields
+    if (localUser.value.username?.trim()) {
+        formData.append('username', localUser.value.username.trim());
+    }
+    if (localUser.value.phone) {
+        formData.append('phone', String(localUser.value.phone).replace(/,/g, '').trim());
+    }
+    formData.append('clan', localUser.value.clan);
+    if (localUser.value.bio.trim()) {
+        formData.append('bio', localUser.value.bio.trim());
+    }
+    if (localUser.value.address.trim()) {
+        formData.append('address', localUser.value.address.trim());
+    }
+    formData.append('is_active', localUser.value.is_active ? '1' : '0');
+    // إرسال الأدوار فقط إذا كان نوع الحساب user
+    if (localUser.value.clan === 'user' && localUser.value.roles.length > 0) {
+        localUser.value.roles.forEach((roleId: number) => {
+            formData.append('role_ids[]', roleId.toString());
+        });
+    } else if (localUser.value.clan === 'customer') {
+        // إرسال مصفوفة فارغة للأدوار عند اختيار customer
+        // أو يمكن عدم إرسالها على الإطلاق
+    }
+
+    // Add password field only if provided
+    if (localUser.value.password.trim()) {
+        formData.append('password', localUser.value.password.trim());
+    }
+
+    // Handle image upload
+    if (imageFile.value) {
+        formData.append('image', imageFile.value);
+    }
+
+    // Handle image deletion
+    if (deleteImage.value) {
+        formData.append('delete_image', '1');
+    }
+
+    // Send credentials flag (only in create mode)
+    if (!props.isEdit && sendCredentials.value) {
+        formData.append('send_credentials', '1');
+    }
+
+    // For PUT requests, add _method
+    if (props.isEdit) {
+        formData.append('_method', 'PUT');
+    }
+
+    // Emit submit event to parent - let parent handle the API call
+    // نمرر callback لإعادة تعيين loading بعد اكتمال الطلب
+    emit('submit', formData, {
+        onSuccess: () => {
+            internalLoading.value = false;
+            // If goToListAfterAction is checked, emit event to go to list
+            if (goToListAfterAction.value) {
+                emit('go-to-list');
+            } else if (!props.isEdit) {
+                // If addAnother is checked, reset form for adding another
+                if (addAnother.value) {
+                    localUser.value = {
+                        name: '',
+                        username: '',
+                        email: '',
+                        phone: null,
+                        password: '',
+                        clan: 'user',
+                        bio: '',
+                        address: '',
+                        is_active: true,
+                        roles: []
+                    };
+                    imagePreview.value = null;
+                    imageFile.value = null;
+                    deleteImage.value = false;
+                    errors.value = {};
+                    submitted.value = false;
+                    addAnother.value = false; // Reset flag
+                } else {
+                    // If not checked and in create mode, reset form
+                    localUser.value = {
+                        name: '',
+                        username: '',
+                        email: '',
+                        phone: null,
+                        password: '',
+                        clan: 'user',
+                        bio: '',
+                        address: '',
+                        is_active: true,
+                        roles: []
+                    };
+                    imagePreview.value = null;
+                    imageFile.value = null;
+                    deleteImage.value = false;
+                    errors.value = {};
+                    submitted.value = false;
+                }
+            }
+        },
+        onError: () => {
+            internalLoading.value = false;
+        }
+    });
+};
+
+// Save and add another
+const handleSaveAndAddAnother = async () => {
+    addAnother.value = true;
+    await handleSubmit();
+};
+
+// Cancel form
+const handleCancel = () => {
+    submitted.value = false;
+    errors.value = {};
+    emit('cancel');
+};
+
+// Handle image selection
+const handleImageSelect = (event: { files: File[] }) => {
+    const file = event.files?.[0];
+    if (!file) return;
+
+    // Verify it's a File object
+    if (!(file instanceof File)) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'خطأ في اختيار الملف',
+            life: 3000,
+        });
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'الرجاء اختيار صورة صحيحة',
+            life: 3000,
+        });
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'الحد الأقصى للصورة 5MB',
+            life: 3000,
+        });
+        return;
+    }
+
+    // Clean up old preview if exists
+    if (imagePreview.value && imagePreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview.value);
+    }
+
+    imageFile.value = file;
+    imagePreview.value = URL.createObjectURL(file);
+    deleteImage.value = false;
+};
+
+// Handle image deletion
+const handleDeleteImage = () => {
+    if (imagePreview.value && imagePreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview.value);
+    }
+    imageFile.value = null;
+    imagePreview.value = null;
+    deleteImage.value = true;
+};
+</script>
+
+<template>
+    <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Hidden username field for password managers (only when password field is present) -->
+        <input
+            v-if="!isEdit"
+            type="text"
+            :value="localUser.email || localUser.username || ''"
+            autocomplete="username"
+            style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0;"
+            tabindex="-1"
+            aria-hidden="true"
+        />
+        <!-- Image Upload -->
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                {{ c('user.fields.image', 'user') || 'الصورة الشخصية' }}
+            </label>
+            <div class="flex items-center gap-4">
+                <Avatar
+                    :image="imagePreview || undefined"
+                    :label="!imagePreview ? (localUser.name?.charAt(0) || 'U') : undefined"
+                    size="xlarge"
+                    shape="circle"
+                    class="bg-primary text-white border-2 border-gray-200"
+                />
+                <div class="flex flex-col gap-2">
+                    <FileUpload
+                        accept="image/*"
+                        mode="basic"
+                        @select="handleImageSelect"
+                        customUpload
+                        auto
+                        severity="secondary"
+                        class="p-button-outlined"
+                        :chooseLabel="c('common.choose', 'common') + ' ' + (c('user.fields.image', 'user') || 'صورة')"
+                        :maxFileSize="5242880"
+                    />
+                    <AppButton
+                        v-if="imagePreview || (props.user && props.user.image)"
+                        :label="c('common.delete', 'common')"
+                        icon="pi pi-trash"
+                        severity="danger"
+                        size="small"
+                        outlined
+                        @click="handleDeleteImage"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Basic Information -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Name -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.name', 'user') }} <span class="text-red-500">*</span>
+                </label>
+                <InputText
+                    v-model="localUser.name"
+                    :placeholder="c('common.enter', 'common') + ' ' + c('user.fields.name', 'user')"
+                    fluid
+                    :class="{ 'p-invalid': errors.name || (submitted && !localUser.name.trim()) }"
+                    required
+                />
+                <small v-if="errors.name || (submitted && !localUser.name.trim())" class="p-error">
+                    {{ errors.name || (submitted && !localUser.name.trim() ? c('common.field_required', 'common') || 'هذا الحقل مطلوب' : '') }}
+                </small>
+            </div>
+
+            <!-- Username -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.username', 'user') }}
+                </label>
+                <InputText
+                    v-model="localUser.username"
+                    :placeholder="c('common.enter', 'common') + ' ' + c('user.fields.username', 'user')"
+                    fluid
+                />
+            </div>
+
+            <!-- Email -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.email', 'user') }} <span class="text-red-500">*</span>
+                </label>
+                <InputText
+                    v-model="localUser.email"
+                    type="email"
+                    :placeholder="c('common.enter', 'common') + ' ' + c('user.fields.email', 'user')"
+                    fluid
+                    :class="{ 'p-invalid': errors.email || (submitted && !localUser.email.trim()) }"
+                    required
+                />
+                <small v-if="errors.email || (submitted && !localUser.email.trim())" class="p-error">
+                    {{ errors.email || (submitted && !localUser.email.trim() ? c('common.field_required', 'common') || 'هذا الحقل مطلوب' : '') }}
+                </small>
+                <!-- Send Credentials (only in create mode) -->
+                <div v-if="!isEdit" class="flex items-center space-x-2 mt-2">
+                    <Checkbox
+                        v-model="sendCredentials"
+                        :binary="true"
+                        inputId="send-credentials"
+                    />
+                    <label for="send-credentials" class="text-sm text-gray-700 cursor-pointer">
+                        {{ c('user.send_credentials', 'user') }}
+                    </label>
+                </div>
+                <small v-if="!isEdit && sendCredentials" class="text-gray-500 text-xs block mt-1">
+                    {{ c('user.send_credentials_help', 'user') }}
+                </small>
+            </div>
+
+            <!-- Phone -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.phone', 'user') }}
+                </label>
+                <InputText
+                    v-model="localUser.phone"
+                    :placeholder="c('common.enter', 'common') + ' ' + c('user.fields.phone', 'user')"
+                    fluid
+                    @input="(e: any) => {
+                        const value = e.target.value.replace(/,/g, '');
+                        localUser.phone = value;
+                    }"
+                />
+            </div>
+
+        </div>
+
+        <!-- Clan and Roles (in one row) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Clan -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.clan', 'user') }}
+                </label>
+                <Select
+                    v-model="localUser.clan"
+                    :options="clanOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="c('common.choose', 'common') + ' ' + c('user.fields.clan', 'user')"
+                    fluid
+                />
+            </div>
+
+            <!-- Roles -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.roles', 'user') }}
+                </label>
+                <MultiSelect
+                    v-model="localUser.roles"
+                    :options="roleOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="c('common.choose') + ' ' + c('user.fields.roles')"
+                    fluid
+                    display="chip"
+                    :disabled="roleOptions.length === 0 || localUser.clan === 'customer'"
+                />
+                <small v-if="localUser.clan === 'customer'" class="text-gray-500 text-sm">
+                    {{ c('user.roles_disabled_for_customer', 'user') || 'الأدوار متاحة فقط للمستخدمين الإداريين' }}
+                </small>
+            </div>
+        </div>
+
+        <!-- Password Field (Only in Create Mode) -->
+        <div v-if="!isEdit" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                {{ c('user.fields.password', 'user') }} <span class="text-red-500">*</span>
+            </label>
+            <Password
+                v-model="localUser.password"
+                :placeholder="c('common.enter') + ' ' + c('user.fields.password')"
+                fluid
+                :class="{ 'p-invalid': errors.password || (submitted && !localUser.password.trim() && !isEdit) }"
+                required
+                toggle-mask
+                :inputProps="{ autocomplete: 'new-password' }"
+            />
+        </div>
+
+        <!-- Additional Information -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Bio -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.bio', 'user') }}
+                </label>
+                <Textarea
+                    v-model="localUser.bio"
+                    :placeholder="c('common.enter') + ' ' + c('user.fields.bio')"
+                    fluid
+                    rows="3"
+                />
+            </div>
+
+            <!-- Address -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    {{ c('user.fields.address', 'user') }}
+                </label>
+                <Textarea
+                    v-model="localUser.address"
+                    :placeholder="c('common.enter') + ' ' + c('user.fields.address')"
+                    fluid
+                    rows="3"
+                />
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="flex items-center space-x-4">
+            <ToggleSwitch
+                v-model="localUser.is_active"
+                :label="c('user.fields.is_active', 'user')"
+            />
+        </div>
+
+        <!-- Go to list after action -->
+        <div class="flex items-center space-x-2">
+            <Checkbox
+                v-model="goToListAfterAction"
+                :binary="true"
+                inputId="go-to-list"
+            />
+            <label for="go-to-list" class="text-sm text-gray-700 cursor-pointer">
+                {{ c('common.go_to_list_after_action', 'common') }}
+            </label>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <AppButton
+                :label="c('common.cancel', 'common')"
+                icon="pi pi-times"
+                severity="secondary"
+                outlined
+                @click="handleCancel"
+            />
+            <AppButton
+                v-if="!isEdit"
+                type="button"
+                :label="c('common.add_another', 'common')"
+                icon="pi pi-plus-circle"
+                severity="info"
+                outlined
+                :loading="internalLoading"
+                :disabled="!isFormValid || internalLoading"
+                @click="handleSaveAndAddAnother"
+            />
+            <AppButton
+                type="submit"
+                :label="isEdit ? c('common.update', 'common') : c('common.create', 'common')"
+                icon="pi pi-check"
+                :loading="internalLoading"
+                :disabled="!isFormValid || internalLoading"
+            />
+        </div>
+    </form>
+</template>
+

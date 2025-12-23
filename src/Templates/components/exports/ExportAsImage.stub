@@ -1,0 +1,176 @@
+<template>
+    <Button
+        size="small"
+        label="IMG"
+        icon="pi pi-image"
+        @click="handleExportAsImage"
+        :loading="loading"
+        severity="info"
+        outlined
+        :disabled="loading"
+    />
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import { useToast } from "primevue/usetoast";
+import html2canvas from "html2canvas";
+
+interface ExportAsImageOptions {
+    fileName: string;
+    dt: any; // DataTable reference
+    quality?: number;
+    scale?: number;
+    backgroundColor?: string;
+}
+
+const props = defineProps<{
+    options: ExportAsImageOptions;
+}>();
+
+const loading = ref(false);
+const toast = useToast();
+
+const handleExportAsImage = async () => {
+    loading.value = true;
+
+    try {
+        const { dt, fileName, quality = 1, scale = 2, backgroundColor = "#ffffff" } = props.options;
+
+        if (!dt) {
+            toast.add({
+                severity: 'warn',
+                summary: 'تحذير',
+                detail: 'الجدول غير جاهز بعد',
+                life: 3000,
+            });
+            return;
+        }
+
+        const tableElement = dt.$el.querySelector("table");
+        if (!tableElement) {
+            toast.add({
+                severity: 'error',
+                summary: 'خطأ',
+                detail: 'لم يتم العثور على الجدول',
+                life: 3000,
+            });
+            return;
+        }
+
+        // استخدام setTimeout لإعطاء الوقت لعرض loading
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // إزالة oklch من العنصر الأصلي قبل الاستنساخ
+        const originalElements = tableElement.querySelectorAll('*');
+        const originalStyles: Map<Element, string> = new Map();
+
+        originalElements.forEach((el: any) => {
+            if (el.style && el.style.cssText) {
+                const originalCssText = el.style.cssText;
+                originalStyles.set(el, originalCssText);
+                // استبدال oklch في العنصر الأصلي مؤقتاً
+                el.style.cssText = originalCssText.replace(/oklch\([^)]+\)/gi, 'rgb(0, 0, 0)');
+            }
+        });
+
+        // استخدام html2canvas لتحويل الجدول إلى صورة
+        const canvas = await html2canvas(tableElement as HTMLElement, {
+            scale: scale,
+            backgroundColor: backgroundColor,
+            useCORS: true,
+            logging: false,
+            onclone: (clonedDoc) => {
+                // إضافة CSS override شامل لإزالة oklch
+                const style = clonedDoc.createElement('style');
+                style.textContent = `
+                    * {
+                        color: rgb(0, 0, 0) !important;
+                        background-color: transparent !important;
+                    }
+                    table, th, td {
+                        color: rgb(0, 0, 0) !important;
+                    }
+                `;
+                clonedDoc.head.appendChild(style);
+
+                // تنظيف جميع العناصر من oklch
+                const allElements = clonedDoc.querySelectorAll('*');
+                allElements.forEach((el: any) => {
+                    if (el.style) {
+                        // تنظيف cssText
+                        if (el.style.cssText) {
+                            el.style.cssText = el.style.cssText.replace(/oklch\([^)]+\)/gi, 'rgb(0, 0, 0)');
+                        }
+                        // تنظيف خصائص CSS الفردية
+                        const styleProps = ['color', 'backgroundColor', 'background', 'borderColor'];
+                        styleProps.forEach(prop => {
+                            try {
+                                const value = el.style.getPropertyValue(prop);
+                                if (value && value.includes('oklch')) {
+                                    if (prop === 'color') {
+                                        el.style.setProperty(prop, 'rgb(0, 0, 0)', 'important');
+                                    } else {
+                                        el.style.setProperty(prop, 'transparent', 'important');
+                                    }
+                                }
+                            } catch (e) {
+                                // تجاهل الأخطاء
+                            }
+                        });
+                    }
+                });
+            },
+        });
+
+        // استعادة الأنماط الأصلية
+        originalElements.forEach((el: any) => {
+            const originalCssText = originalStyles.get(el);
+            if (originalCssText !== undefined) {
+                el.style.cssText = originalCssText;
+            }
+        });
+
+        // تحويل canvas إلى blob ثم إلى رابط تحميل
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                toast.add({
+                    severity: 'error',
+                    summary: 'خطأ',
+                    detail: 'فشل في إنشاء الصورة',
+                    life: 3000,
+                });
+                return;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            link.download = `${fileName}-${dateStr}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast.add({
+                severity: 'success',
+                summary: 'نجح',
+                detail: 'تم تصدير الصورة بنجاح',
+                life: 3000,
+            });
+        }, "image/png", quality);
+    } catch (error) {
+        console.error("Error generating image:", error);
+        toast.add({
+            severity: 'error',
+            summary: 'خطأ',
+            detail: 'فشل في إنشاء الصورة',
+            life: 3000,
+        });
+    } finally {
+        loading.value = false;
+    }
+};
+</script>
+

@@ -1,0 +1,129 @@
+/**
+ * Dashboard Entry Point
+ * Main entry file for Vue 3 Dashboard
+ */
+
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import { createPinia } from 'pinia';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
+import Aura from '@primevue/themes/aura';
+import primevueArabicLocale from '@dashboard/utilities/primevue-locale';
+
+// Import dashboard components
+import App from '@dashboard/App.vue';
+
+// Import router
+import router from '@dashboard/router/index';
+
+// Import global components
+import {
+  PageHeader,
+  AppButton,
+  Can,
+  ExportAsPdf,
+  ExportAsExcel,
+  ExportAsImage,
+  DateFormat,
+} from "@shared/components";
+
+// Initialize translations
+import { initTranslations, c } from '@dashboard/utilities/langHelper';
+
+// Initialize font configuration
+import { useFontConfig } from '@shared/composables/useFontConfig';
+// Initialize color configuration
+import { useColorConfig } from '@shared/composables/useColorConfig';
+
+// Get props from data-props attribute (hidden in HTML)
+const appElement = document.getElementById('dashboard-app');
+if (!appElement) {
+    throw new Error('Dashboard app element not found');
+}
+const props = JSON.parse(appElement?.dataset.props || '{}');
+
+// Load translations from data-props (passed from Laravel blade template)
+// Translations are loaded from Laravel lang/ directory and passed via data-props
+const translations = props.translations || {};
+const locale = props.locale || 'ar';
+const fallbackLocale = props.fallback_locale || 'en';
+
+// Debug: Log props to see what's being passed
+if (import.meta.env.DEV) {
+    // console.log('Dashboard props:', {
+    //     hasTranslations: !!props.translations,
+    //     translationsKeys: Object.keys(translations),
+    //     translations: translations,
+    //     locale,
+    //     fallbackLocale,
+    // });
+
+    // Debug specific translation keys
+    // console.log('Translation check:', {
+    //     'user.plural': translations?.user?.plural,
+    //     'role.plural': translations?.role?.plural,
+    //     'permission.plural': translations?.permission?.plural,
+    //     'profile.edit_data': translations?.profile?.edit_data,
+    // });
+}
+
+initTranslations(translations, locale, fallbackLocale);
+
+// Create Vue app with props
+const app = createApp(App, {
+    bearer: props.bearer,
+    auth: props.auth,
+    application: props.application,
+    settings: props.settings,
+    dropdowns: props.dropdowns,
+});
+
+// Initialize Pinia
+const pinia = createPinia();
+app.use(pinia);
+
+// Configure PrimeVue
+app.use(PrimeVue, {
+    theme: {
+        preset: Aura,
+        options: {
+            darkModeSelector: '.dark-mode',
+        },
+    },
+    locale: {
+        ...primevueArabicLocale,
+    },
+});
+
+// Use PrimeVue services
+app.use(ToastService);
+app.use(ConfirmationService);
+
+// Use router
+app.use(router);
+
+// Register global components
+app.component('PageHeader', PageHeader);
+app.component('AppButton', AppButton);
+app.component('Can', Can);
+app.component('ExportAsPdf', ExportAsPdf);
+app.component('ExportAsExcel', ExportAsExcel);
+app.component('ExportAsImage', ExportAsImage);
+app.component('DateFormat', DateFormat);
+
+// Register global properties for translation
+app.config.globalProperties.$c = c;
+
+// Mount app
+app.mount('#dashboard-app');
+
+// Initialize font configuration after mount
+const { initializeFont } = useFontConfig();
+initializeFont();
+
+// Initialize color configuration after mount
+const { initializeColor } = useColorConfig();
+initializeColor();
+

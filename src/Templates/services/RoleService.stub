@@ -1,0 +1,159 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Role;
+use App\Http\Resources\RoleResource;
+use Illuminate\Http\Request;
+
+class RoleService
+{
+    /**
+     * Get paginated list of resources
+     */
+    public function index(Request $request): array
+    {
+        $query = Role::query()->with(['permissions', 'users']);
+
+        // Search
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->orWhere('title', 'like', "%{$search}%");
+            });
+        }
+
+        // Filters
+        // Add custom filters here
+        // Example: if ($request->has('status')) { $query->where('status', $request->status); }
+
+        // Sorting
+        $sortBy = $request->get('sort_by', 'id');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
+
+        // Pagination
+        $perPage = $request->get('per_page', 15);
+        $items = $query->paginate($perPage);
+
+        return [
+            'data' => RoleResource::collection($items),
+            'meta' => [
+                'current_page' => $items->currentPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
+                'last_page' => $items->lastPage(),
+                'from' => $items->firstItem(),
+                'to' => $items->lastItem(),
+            ],
+            'options' => [
+                // Add additional options here (categories, filters, etc.)
+            ],
+        ];
+    }
+
+    /**
+     * Create a new resource
+     */
+    public function create(array $data)
+    {
+        return Role::create($data);
+    }
+
+    /**
+     * Get a single resource by ID
+     */
+    public function show($id)
+    {
+        return Role::with(['permissions', 'users'])->findOrFail($id);
+    }
+
+    /**
+     * Update an existing resource
+     *
+     * @param int $id
+     * @param array $data
+     * @param \Illuminate\Http\UploadedFile|null $imageFile Optional file upload (if model has image field)
+     * @return Role
+     */
+    public function update($id, array $data, ?\Illuminate\Http\UploadedFile $imageFile = null)
+    {
+        // Remove image from data array as it will be handled separately if provided
+        unset($data['image']);
+
+        $item = Role::findOrFail($id);
+
+        // Handle image upload if present (uncomment and customize if model has image field)
+        // if ($imageFile) {
+        //     // Delete old image if exists
+        //     if ($item->image && \Storage::disk('public')->exists($item->image)) {
+        //         \Storage::disk('public')->delete($item->image);
+        //     }
+        //     // Store new image
+        //     $data['image'] = $imageFile->store('roles', 'public');
+        // }
+
+        $item->update($data);
+        return $item->fresh();
+    }
+
+    /**
+     * Delete a resource
+     */
+    public function delete($id)
+    {
+        $item = Role::findOrFail($id);
+        $item->delete();
+        return true;
+    }
+
+    /**
+     * Delete multiple resources
+     */
+    public function multipleDelete(array $ids)
+    {
+        return Role::whereIn('id', $ids)->delete();
+    }
+
+    /**
+     * Activate multiple resources
+     * Checks for is_active, is_published, or status field
+     */
+    public function bulkActivate(array $ids): int
+    {
+        $model = new Role();
+        $fillable = $model->getFillable();
+
+        // Check which activation field exists
+        if (in_array('is_active', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['is_active' => true]);
+        } elseif (in_array('is_published', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['is_published' => true]);
+        } elseif (in_array('status', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['status' => 'active']);
+        }
+
+        return 0; // No activation field found
+    }
+
+    /**
+     * Deactivate multiple resources
+     * Checks for is_active, is_published, or status field
+     */
+    public function bulkDeactivate(array $ids): int
+    {
+        $model = new Role();
+        $fillable = $model->getFillable();
+
+        // Check which activation field exists
+        if (in_array('is_active', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['is_active' => false]);
+        } elseif (in_array('is_published', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['is_published' => false]);
+        } elseif (in_array('status', $fillable)) {
+            return Role::whereIn('id', $ids)->update(['status' => 'inactive']);
+        }
+
+        return 0; // No activation field found
+    }
+}

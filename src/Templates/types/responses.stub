@@ -1,0 +1,99 @@
+/**
+ * Shared TypeScript types for responses
+ * Used by both dashboard and frontend
+ *
+ * @module types/responses
+ */
+
+/**
+ * Base model interface
+ */
+export interface BaseModel {
+    id: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * Paginated response structure
+ */
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        per_page: number;
+        current_page: number;
+        last_page: number;
+        from: number;
+        to: number;
+    };
+    options?: any;
+}
+
+/**
+ * Permission interface
+ */
+export interface Permission {
+    id: number;
+    title: string;
+    name: string;
+    roles?: Role[];
+    roles_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * Role interface
+ */
+export interface Role {
+    id: number;
+    title: string;
+    description?: string;
+    permissions?: Permission[];
+    permissions_count?: number;
+    users_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/**
+ * User interface
+ */
+export interface User extends BaseModel {
+    name: string;
+    username?: string;
+    email: string;
+    phone?: string | null;
+    clan?: 'user' | 'customer';
+    bio?: string | null;
+    image?: string | null;
+    address?: string | null;
+    is_active: boolean | number;
+    roles?: Role[];
+    roles_count?: number;
+}
+
+/**
+ * Application interface
+ */
+export interface Application extends BaseModel {
+    name: string;
+    alias?: string;
+    notes?: string;
+    description?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    logo?: string;
+    favicon?: string;
+    status?: boolean;
+    is_active?: boolean;
+}
+
+// Export model types (generated types will be added here automatically)
+export type { Article } from './article';
+export type { Product } from './product';
+export type { Category } from './category';
+export type { Page } from './page';
+

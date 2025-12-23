@@ -1,0 +1,16 @@
+<?php
+
+use App\Http\Controllers\PermissionController;
+use Illuminate\Support\Facades\Route;
+
+// Permission Resource Routes
+Route::apiResource('permissions', PermissionController::class);
+
+// Bulk Actions
+Route::post('permissions/bulk-delete', [PermissionController::class, 'destroyMultiple'])->name('permissions.bulk-delete');
+Route::post('permissions/bulk-activate', [PermissionController::class, 'bulkActivate'])->name('permissions.bulk-activate');
+Route::post('permissions/bulk-deactivate', [PermissionController::class, 'bulkDeactivate'])->name('permissions.bulk-deactivate');
+
+// Other custom actions routes
+// Add custom routes here as needed
+// Example: Route::post('permissions/{id}/custom-action', [PermissionController::class, 'customAction'])->name('permissions.custom-action');

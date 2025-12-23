@@ -1,0 +1,225 @@
+<script lang="ts" setup>
+import { ref, onMounted } from 'vue';
+import { c } from '@dashboard/utilities/langHelper';
+import Can from '@shared/components/Can.vue';
+import DashboardStatistic from '@dashboard/components/Dashboard_Statistic.vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@shared/stores/auth_store';
+
+const router = useRouter();
+const authStore = useAuthStore();
+
+const navigateTo = (route: string) => {
+    router.push(route);
+};
+
+const hasPermission = (permission: string): boolean => {
+    if (!authStore.user) return false;
+    return authStore.hasPermissions([permission]);
+};
+
+// Collapse states - default to open (uncollapsed)
+const quickActionsCollapsed = ref(false);
+const statisticsCollapsed = ref(false);
+
+// Load collapse states from localStorage
+onMounted(() => {
+    // Only load from localStorage if values exist, otherwise keep default (false = open)
+    const savedQuickActions = localStorage.getItem('dashboard-quick-actions-collapsed');
+    const savedStatistics = localStorage.getItem('dashboard-statistics-collapsed');
+
+    // If no saved state, default to open (false)
+    // Only apply saved state if it exists
+    if (savedQuickActions !== null) {
+        quickActionsCollapsed.value = savedQuickActions === 'true';
+    }
+    if (savedStatistics !== null) {
+        statisticsCollapsed.value = savedStatistics === 'true';
+    }
+});
+
+const toggleQuickActions = () => {
+    quickActionsCollapsed.value = !quickActionsCollapsed.value;
+    localStorage.setItem('dashboard-quick-actions-collapsed', quickActionsCollapsed.value.toString());
+};
+
+const toggleStatistics = () => {
+    statisticsCollapsed.value = !statisticsCollapsed.value;
+    localStorage.setItem('dashboard-statistics-collapsed', statisticsCollapsed.value.toString());
+};
+</script>
+
+<template>
+    <div class="p-4">
+        <PageHeader
+            :title="c('common.dashboard', 'common') || 'لوحة التحكم'"
+            :description="c('common.welcome', 'common') || 'مرحباً بك في لوحة التحكم'"
+            icon="pi pi-home"
+        />
+
+        <!-- Quick Actions -->
+        <Card class="mt-6">
+            <template #header>
+                <div class="quick-actions-header" @click="toggleQuickActions">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-bolt"></i>
+                        <h3 class="quick-actions-title">
+                            {{ c('common.quick_actions', 'common') || 'الإجراءات السريعة' }}
+                        </h3>
+                    </div>
+                    <i
+                        :class="[
+                            'pi transition-transform duration-300',
+                            quickActionsCollapsed ? 'pi-angle-down' : 'pi-angle-up'
+                        ]"
+                    ></i>
+                </div>
+            </template>
+            <template #content>
+                <div
+                    class="quick-actions-grid"
+                    :class="{ 'collapsed': quickActionsCollapsed }"
+                >
+                <div
+                    v-if="hasPermission('user_create')"
+                    class="quick-action-card quick-action-primary"
+                    @click="navigateTo('/users/do/create')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-user-plus"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('user.create', 'user') || 'إضافة مستخدم' }}</h4>
+                        <p class="quick-action-description">إنشاء مستخدم جديد في النظام</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('role_create')"
+                    class="quick-action-card quick-action-success"
+                    @click="navigateTo('/roles/do/create')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-id-card"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('role.create', 'role') || 'إضافة دور' }}</h4>
+                        <p class="quick-action-description">إنشاء دور جديد مع الصلاحيات</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('user_access')"
+                    class="quick-action-card quick-action-info"
+                    @click="navigateTo('/authorization?tab=users')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-users"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('user.plural', 'user') || 'المستخدمين' }}</h4>
+                        <p class="quick-action-description">عرض وإدارة جميع المستخدمين</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('role_access')"
+                    class="quick-action-card quick-action-warning"
+                    @click="navigateTo('/authorization?tab=roles')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-shield"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('role.plural', 'role') || 'الأدوار' }}</h4>
+                        <p class="quick-action-description">عرض وإدارة الأدوار والصلاحيات</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('permission_access')"
+                    class="quick-action-card quick-action-help"
+                    @click="navigateTo('/authorization?tab=permissions')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-key"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('permission.plural', 'permission') || 'الصلاحيات' }}</h4>
+                        <p class="quick-action-description">عرض وإدارة جميع الصلاحيات</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('setting_access')"
+                    class="quick-action-card quick-action-secondary"
+                    @click="navigateTo('/settings')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-cog"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('common.settings', 'common') || 'الإعدادات' }}</h4>
+                        <p class="quick-action-description">تعديل إعدادات التطبيق العامة</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+
+                <div
+                    v-if="hasPermission('profile_edit')"
+                    class="quick-action-card quick-action-contrast"
+                    @click="navigateTo('/profile')"
+                >
+                    <div class="quick-action-icon">
+                        <i class="pi pi-user"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <h4 class="quick-action-label">{{ c('common.profile', 'common') || 'الملف الشخصي' }}</h4>
+                        <p class="quick-action-description">عرض وتعديل الملف الشخصي</p>
+                    </div>
+                    <i class="pi pi-arrow-left quick-action-arrow"></i>
+                </div>
+                </div>
+            </template>
+        </Card>
+
+        <div class="mt-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Add your dashboard widgets here -->
+            </div>
+        </div>
+
+        <!-- Dashboard Statistics -->
+        <Can :permissions="['dashboard_access','setting_access','application_access']">
+            <Card class="mt-6">
+                <template #header>
+                    <div class="statistics-header" @click="toggleStatistics">
+                        <div class="flex items-center gap-2">
+                            <i class="pi pi-chart-bar"></i>
+                            <h3 class="statistics-title">
+                                {{ c('statistics.title', 'common') || 'الإحصائيات' }}
+                            </h3>
+                        </div>
+                        <i
+                            :class="[
+                                'pi transition-transform duration-300',
+                                statisticsCollapsed ? 'pi-angle-down' : 'pi-angle-up'
+                            ]"
+                        ></i>
+                    </div>
+                </template>
+                <template #content>
+                    <div :class="{ 'collapsed': statisticsCollapsed }">
+                        <DashboardStatistic />
+                    </div>
+                </template>
+            </Card>
+        </Can>
+    </div>
+</template>
+

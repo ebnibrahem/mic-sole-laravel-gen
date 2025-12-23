@@ -1,0 +1,134 @@
+import { ref, computed } from 'vue';
+
+// Available fonts configuration
+export const availableFonts = [
+    {
+        name: 'Cairo - القاهرة',
+        value: 'Cairo',
+        family: '"Cairo", sans-serif',
+        description: 'خط حديث وأنيق مناسب للواجهات'
+    },
+    {
+        name: 'Noto Sans Arabic - نوتو سانس عربي',
+        value: 'Noto Sans Arabic',
+        family: '"Noto Sans Arabic", sans-serif',
+        description: 'خط Google الرسمي للعربية'
+    },
+    {
+        name: 'Amiri - أميري',
+        value: 'Amiri',
+        family: '"Amiri", serif',
+        description: 'خط تقليدي أنيق للقراءة'
+    },
+    {
+        name: 'Scheherazade New - شهرزاد جديد',
+        value: 'Scheherazade New',
+        family: '"Scheherazade New", serif',
+        description: 'خط كلاسيكي للعربية'
+    },
+    {
+        name: 'IBM Plex Sans Arabic - آي بي إم بليكس',
+        value: 'IBM Plex Sans Arabic',
+        family: '"IBM Plex Sans Arabic", sans-serif',
+        description: 'خط تقني حديث من IBM'
+    },
+    {
+        name: 'Tajawal - تجوال',
+        value: 'Tajawal',
+        family: '"Tajawal", sans-serif',
+        description: 'خط سعودي حديث ومتطور'
+    },
+    {
+        name: 'Rubik - روبيك',
+        value: 'Rubik',
+        family: '"Rubik", sans-serif',
+        description: 'خط عالمي حديث ومتعدد الأوزان'
+    }
+];
+
+// Current selected font
+const selectedFont = ref<string>('Cairo');
+
+// Font configuration composable
+export function useFontConfig() {
+    // Get current font from localStorage
+    const getCurrentFont = (): string => {
+        return localStorage.getItem('selected-font') || 'Cairo';
+    };
+
+    // Set font in localStorage
+    const setFont = (fontValue: string): void => {
+        localStorage.setItem('selected-font', fontValue);
+        selectedFont.value = fontValue;
+    };
+
+    // Get font family string
+    const getFontFamily = (fontValue: string): string => {
+        const font = availableFonts.find(f => f.value === fontValue);
+        return font ? font.family : '"Cairo", sans-serif';
+    };
+
+    // Apply font to document
+    const applyFont = (fontValue: string): void => {
+        const fontFamily = getFontFamily(fontValue);
+
+        // Update CSS custom property
+        document.documentElement.style.setProperty('--font-Dashboard-Font', fontFamily);
+
+        // Update body font
+        document.body.style.fontFamily = fontFamily;
+
+        // Apply to all elements with specific classes (excluding icons)
+        const elementsToUpdate = document.querySelectorAll('.dashboard-content, .nav-item, .nav-text, h1, h2, h3, h4, h5, h6, p, span, div:not(.p-button-icon):not([class*="pi-"]):not([class*="fa-"]):not([class*="icon-"])');
+        elementsToUpdate.forEach(element => {
+            // Skip icon elements
+            if (element.tagName === 'I' ||
+                element.classList.contains('pi') ||
+                element.classList.contains('p-button-icon') ||
+                element.classList.contains('p-icon') ||
+                Array.from(element.classList).some(cls => cls.startsWith('pi-') || cls.startsWith('fa-') || cls.startsWith('icon-'))) {
+                return;
+            }
+            (element as HTMLElement).style.fontFamily = fontFamily;
+        });
+
+        // Save to localStorage
+        setFont(fontValue);
+
+        // Dispatch custom event
+        const event = new CustomEvent('font-changed', {
+            detail: {
+                font: fontValue,
+                family: fontFamily,
+                fontData: availableFonts.find(f => f.value === fontValue)
+            }
+        });
+        window.dispatchEvent(event);
+    };
+
+    // Initialize font on app start
+    const initializeFont = (): void => {
+        const savedFont = getCurrentFont();
+        applyFont(savedFont);
+    };
+
+    // Computed properties
+    const currentFont = computed(() => selectedFont.value);
+    const currentFontFamily = computed(() => getFontFamily(selectedFont.value));
+    const currentFontData = computed(() =>
+        availableFonts.find(f => f.value === selectedFont.value)
+    );
+
+    return {
+        availableFonts,
+        currentFont,
+        currentFontFamily,
+        currentFontData,
+        getCurrentFont,
+        setFont,
+        getFontFamily,
+        applyFont,
+        initializeFont
+    };
+}
+

@@ -1,0 +1,6 @@
+// TypeScript types for {{modelName}}
+
+{{types}}
+
+export default {{modelName}};
+

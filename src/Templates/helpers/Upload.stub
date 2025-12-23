@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Helpers;
+
+use Illuminate\Support\Facades\Storage;
+
+class Upload
+{
+    /**
+     * Handle Base64 image upload
+     * @param string $imageData
+     * @param string $dir
+     * @param string $imageName, image name with extension
+     * @return string
+     */
+    public static function uploadImageBase64(string $imageData, string $dir = 'images', string $imageName = ''): string
+    {
+        // Extract image data and type
+        $imageInfo = explode(',', $imageData);
+        $imageType = explode(';', $imageInfo[0])[0];
+        $imageType = str_replace('data:', '', $imageType);
+        $imageType = str_replace('image/', '', $imageType);
+
+        // Validate image type
+        if (!in_array($imageType, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            throw new \InvalidArgumentException('Unsupported image type: ' . $imageType);
+        }
+
+        // Generate filename
+        if (empty($imageName)) {
+            $imageName = time() . '_' . uniqid() . '.' . $imageType;
+        } elseif (!str_ends_with($imageName, '.' . $imageType)) {
+            $imageName .= '.' . $imageType;
+        }
+
+        // Decode and save image
+        $decodedImage = base64_decode($imageInfo[1]);
+        if ($decodedImage === false) {
+            throw new \InvalidArgumentException('Invalid base64 image data');
+        }
+
+        $uploadPath = $dir . '/' . $imageName;
+        Storage::disk('public')->put($uploadPath, $decodedImage);
+
+        return $uploadPath;
+    }
+
+    /**
+     * Handle file upload
+     * @param $file
+     * @param string $dir
+     * @param string $filename, file name with extension
+     * @return string
+     */
+    public static function uploadFile($file, string $dir = 'files', string $filename = ''): string
+    {
+        if (empty($filename)) {
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        }
+
+        $path = $file->storeAs($dir, $filename, 'public');
+        return $path;
+    }
+
+    /**
+     * Handle image upload (alias for uploadFile)
+     * @param $file
+     * @param string $dir
+     * @param string $filename
+     * @return string
+     */
+    public static function image($file, string $dir = 'images', string $filename = ''): string
+    {
+        return self::uploadFile($file, $dir, $filename);
+    }
+
+    /**
+     * Delete file from storage
+     * @param string $filePath
+     * @return bool
+     */
+    public static function deleteFile(string $filePath): bool
+    {
+        if (empty($filePath)) {
+            return false;
+        }
+
+        $path = str_replace('storage/', '', $filePath);
+        return Storage::disk('public')->delete($path);
+    }
+
+    /**
+     * Delete file from storage (alias for deleteFile)
+     * @param string $filePath
+     * @return bool
+     */
+    public static function delete(string $filePath): bool
+    {
+        return self::deleteFile($filePath);
+    }
+
+    /**
+     * Get file URL
+     * @param string $filePath
+     * @return string
+     */
+    public static function getFileUrl(string $filePath): string
+    {
+        if (str_starts_with($filePath, 'storage/')) {
+            return asset($filePath);
+        }
+
+        return asset('storage/' . $filePath);
+    }
+}
+

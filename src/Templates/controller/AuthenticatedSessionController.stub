@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
+use Illuminate\View\View;
+
+class AuthenticatedSessionController extends Controller
+{
+    /**
+     * Show the login page.
+     */
+    public function create(Request $request): View
+    {
+        return view('auth.login', [
+            'canResetPassword' => Route::has('password.request'),
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    /**
+     * Handle an incoming authentication request.
+     */
+    public function store(LoginRequest $request): RedirectResponse
+    {
+        $request->authenticate();
+
+        $request->session()->regenerate();
+
+        // Create Sanctum token for API authentication
+        $user = Auth::user();
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        // Store token in session for dashboard
+        $request->session()->put('bearer_token', $token);
+
+        // Check if there's a redirect parameter
+        $redirect = $request->input('redirect');
+
+        if ($redirect) {
+            // Parse the redirect URL to extract the path and hash
+            $parsedUrl = parse_url($redirect);
+            $path = $parsedUrl['path'] ?? '/';
+            $hash = $parsedUrl['fragment'] ?? '';
+
+            // For SPA routes, always redirect to /dashboard with hash fragment
+            // Vue Router uses hash history, so all routes are in hash fragment
+            $vueRouterPath = '';
+
+            // Priority 1: If path is not /dashboard or /, use path as Vue Router route
+            // This handles cases like /settings -> /dashboard#/settings
+            if ($path !== '/' && $path !== '/dashboard') {
+                $vueRouterPath = $path;
+            }
+            // Priority 2: If hash fragment exists and is meaningful (not just empty or '/')
+            elseif ($hash !== '' && $hash !== '/') {
+                // Use hash fragment as Vue Router path
+                $vueRouterPath = $hash;
+            }
+            // Priority 3: If hash is just '/', it means root Vue Router route
+            elseif ($hash === '/') {
+                $vueRouterPath = '/';
+            }
+
+            // Construct redirect URL
+            if ($vueRouterPath !== '') {
+                // Ensure hash path starts with / for Vue Router
+                if (!str_starts_with($vueRouterPath, '/')) {
+                    $vueRouterPath = '/' . $vueRouterPath;
+                }
+                return redirect('/dashboard#' . $vueRouterPath);
+            }
+
+            // Default: redirect to /dashboard
+            return redirect('/dashboard');
+        }
+
+        // Default redirect to root path (dashboard)
+        return redirect()->intended('/dashboard');
+    }
+
+    /**
+     * Destroy an authenticated session.
+     */
+    public function destroy(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+
+        // Revoke all API tokens for the user
+        if ($user) {
+            $user->tokens()->delete();
+        }
+
+        // Clear API token from session
+        $request->session()->forget('bearer_token');
+
+        // Logout the user
+        Auth::guard('web')->logout();
+
+        // Invalidate and regenerate session
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/')->with('status', 'تم تسجيل الخروج بنجاح');
+    }
+}
+

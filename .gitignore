@@ -1,0 +1,44 @@
+# IDE
+.idea/
+.vscode/
+.phpactor.json
+.fleet/
+.nova/
+.zed/
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build files
+dist/
+build/
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Cache
+.phpunit.cache/
+*.cache
+
+# Testing
+coverage/
+.phpunit.result.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Package specific
+storage/app/mic-sole-laravel-gen/

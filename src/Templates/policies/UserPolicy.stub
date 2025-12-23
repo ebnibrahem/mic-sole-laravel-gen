@@ -1,0 +1,11 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\User;
+use App\Models\User;
+
+class UserPolicy
+{
+    // Policy methods for User
+}

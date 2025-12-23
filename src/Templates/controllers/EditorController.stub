@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Helpers\Upload;
+use Illuminate\Http\Request;
+
+class EditorController extends Controller
+{
+    /**
+     * Upload image for rich text editor.
+     * This is a general endpoint for uploading images used in editor content.
+     */
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max
+            'dir' => 'nullable|string',
+        ]);
+
+        $dir = $request->input('dir', 'images/editor');
+        $file = $request->file('image');
+
+        $path = Upload::image($file, $dir);
+        $url = Upload::getFileUrl($path);
+
+        return $this->apiResponse(
+            data: [
+                'path' => $path,
+                'url' => $url,
+            ],
+            message: 'تم رفع الصورة بنجاح'
+        );
+    }
+}
+

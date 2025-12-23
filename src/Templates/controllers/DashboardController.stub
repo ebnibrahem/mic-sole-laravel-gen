@@ -1,0 +1,114 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Role;
+use App\Models\Permission;
+use Illuminate\Http\Request;
+use Carbon\Carbon;
+
+class DashboardController extends Controller
+{
+    /**
+     * Get dashboard statistics
+     */
+    public function statistics(Request $request)
+    {
+        $period = $request->get('period', 'month'); // today, week, month, year
+
+        // Calculate date range based on period
+        [$startDate, $endDate, $previousStartDate, $previousEndDate] = $this->getDateRange($period);
+
+        // Current period counts
+        $usersCount = User::whereBetween('created_at', [$startDate, $endDate])->count();
+        $rolesCount = Role::whereBetween('created_at', [$startDate, $endDate])->count();
+        $permissionsCount = Permission::whereBetween('created_at', [$startDate, $endDate])->count();
+        $activeUsersCount = User::where('is_active', true)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->count();
+
+        // Previous period counts for comparison
+        $previousUsersCount = User::whereBetween('created_at', [$previousStartDate, $previousEndDate])->count();
+        $previousRolesCount = Role::whereBetween('created_at', [$previousStartDate, $previousEndDate])->count();
+        $previousPermissionsCount = Permission::whereBetween('created_at', [$previousStartDate, $previousEndDate])->count();
+        $previousActiveUsersCount = User::where('is_active', true)
+            ->whereBetween('created_at', [$previousStartDate, $previousEndDate])
+            ->count();
+
+        // Calculate percentage changes
+        $usersChange = $previousUsersCount > 0
+            ? round((($usersCount - $previousUsersCount) / $previousUsersCount) * 100, 1)
+            : ($usersCount > 0 ? 100 : 0);
+
+        $rolesChange = $previousRolesCount > 0
+            ? round((($rolesCount - $previousRolesCount) / $previousRolesCount) * 100, 1)
+            : ($rolesCount > 0 ? 100 : 0);
+
+        $permissionsChange = $previousPermissionsCount > 0
+            ? round((($permissionsCount - $previousPermissionsCount) / $previousPermissionsCount) * 100, 1)
+            : ($permissionsCount > 0 ? 100 : 0);
+
+        $activeUsersChange = $previousActiveUsersCount > 0
+            ? round((($activeUsersCount - $previousActiveUsersCount) / $previousActiveUsersCount) * 100, 1)
+            : ($activeUsersCount > 0 ? 100 : 0);
+
+        $statistics = [
+            'users_count' => $usersCount,
+            'roles_count' => $rolesCount,
+            'permissions_count' => $permissionsCount,
+            'active_users_count' => $activeUsersCount,
+            'users_change' => $usersChange,
+            'roles_change' => $rolesChange,
+            'permissions_change' => $permissionsChange,
+            'active_users_change' => $activeUsersChange,
+        ];
+
+        return $this->apiResponse(
+            data: $statistics,
+            message: 'تم جلب الإحصائيات بنجاح'
+        );
+    }
+
+    /**
+     * Get date range based on period
+     */
+    private function getDateRange(string $period): array
+    {
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'today':
+                $startDate = $now->copy()->startOfDay();
+                $endDate = $now->copy()->endOfDay();
+                $previousStartDate = $now->copy()->subDay()->startOfDay();
+                $previousEndDate = $now->copy()->subDay()->endOfDay();
+                break;
+
+            case 'week':
+                $startDate = $now->copy()->startOfWeek();
+                $endDate = $now->copy()->endOfWeek();
+                $previousStartDate = $now->copy()->subWeek()->startOfWeek();
+                $previousEndDate = $now->copy()->subWeek()->endOfWeek();
+                break;
+
+            case 'year':
+                $startDate = $now->copy()->startOfYear();
+                $endDate = $now->copy()->endOfYear();
+                $previousStartDate = $now->copy()->subYear()->startOfYear();
+                $previousEndDate = $now->copy()->subYear()->endOfYear();
+                break;
+
+            case 'month':
+            default:
+                $startDate = $now->copy()->startOfMonth();
+                $endDate = $now->copy()->endOfMonth();
+                $previousStartDate = $now->copy()->subMonth()->startOfMonth();
+                $previousEndDate = $now->copy()->subMonth()->endOfMonth();
+                break;
+        }
+
+        return [$startDate, $endDate, $previousStartDate, $previousEndDate];
+    }
+}
+

@@ -1,0 +1,464 @@
+<script setup lang="ts">
+import { c, storage } from '@shared/libs/filters';
+import { useAuthStore } from '@shared/stores/auth_store';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
+import { useApiHandler, createPrimeVueToastHandler } from '@dashboard/services/apiHandler';
+import type { User, Role, Permission } from '@shared/types/responses';
+
+const toast = useToast();
+const authStore = useAuthStore();
+const { apiCall } = useApiHandler('dashboard');
+const toastHandler = createPrimeVueToastHandler(toast);
+
+const loading = ref(false);
+const saving = ref(false);
+const savingPassword = ref(false);
+
+const activeTab = ref('info');
+
+// Form for profile data
+const form = ref({
+    name: '',
+    username: '',
+    email: '',
+    phone: '',
+    image: null as File | null
+});
+
+const imagePreview = ref<string | undefined>(undefined);
+
+// Form for password change
+const passwordForm = ref({
+    current_password: '',
+    password: '',
+    password_confirmation: ''
+});
+
+const roles = computed(() => authStore.user?.roles || []);
+const permissions = computed(() => {
+    const permsMap = new Map<string, Permission>();
+    roles.value.forEach(role => {
+        role.permissions?.forEach(p => {
+            if (p.name && !permsMap.has(p.name)) {
+                permsMap.set(p.name, p);
+            }
+        });
+    });
+    return Array.from(permsMap.values());
+});
+
+// Load profile data
+const loadProfile = () => {
+    const u = authStore.user;
+    if (!u) return;
+
+    form.value.name = u.name || '';
+    form.value.username = (u as any).username || '';
+    form.value.email = u.email || '';
+    form.value.phone = u.phone || '';
+    form.value.image = null; // Reset file input
+
+    // Update image preview
+    if (u.image && typeof u.image === 'string') {
+        imagePreview.value = storage(u.image);
+    } else {
+        imagePreview.value = undefined;
+    }
+};
+
+// Handle image selection
+const handleImageSelect = (event: { files: File[] }) => {
+    const file = event.files?.[0];
+    if (!file) return;
+
+    // Verify it's a File object (not a blob URL)
+    if (!(file instanceof File)) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'خطأ في اختيار الملف',
+            life: 2500
+        });
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'الرجاء اختيار صورة صحيحة',
+            life: 2500
+        });
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.error', 'common'),
+            detail: 'الحد الأقصى للصورة 5MB',
+            life: 2500
+        });
+        return;
+    }
+
+    if (imagePreview.value && imagePreview.value.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview.value);
+    }
+
+    form.value.image = file;
+    imagePreview.value = URL.createObjectURL(file);
+};
+
+// Save profile
+const saveProfile = async () => {
+    if (!authStore.user?.id) return;
+
+    saving.value = true;
+
+    const formData = new FormData();
+    formData.append('name', form.value.name);
+    formData.append('username', form.value.username);
+    formData.append('email', form.value.email);
+    formData.append('phone', form.value.phone);
+    // لا حاجة لإضافة _method يدوياً - apiHandler سيفعل ذلك تلقائياً
+
+    // Add image file if selected - append directly without creating new File
+    if (form.value.image && form.value.image instanceof File) {
+        formData.append('image', form.value.image);
+    }
+
+    await apiCall({
+        endpoint: `users/${authStore.user.id}`,
+        method: 'put',
+        payload: formData,
+        useFormData: true,
+        onSuccess: (data: any) => {
+            toastHandler.success(c('common.updated_successfully', 'common') || 'تم التحديث بنجاح');
+
+            // Preserve roles and permissions from current user if not in response
+            const updatedUser = { ...data };
+            if (!updatedUser.roles && authStore.user?.roles) {
+                updatedUser.roles = authStore.user.roles;
+            }
+
+            // Update auth store
+            authStore.setUser(updatedUser);
+
+            // Clean up temporary file and update preview with saved image
+            if (form.value.image instanceof File) {
+                // Revoke old blob URL
+                if (imagePreview.value && imagePreview.value.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreview.value);
+                }
+                // Update preview with server response
+                if (data.image) {
+                    imagePreview.value = storage(data.image);
+                }
+            }
+
+            // Reload form data
+            loadProfile();
+        },
+        onError: (message) => {
+            toastHandler.error(message || c('common.messages.failed', 'common'));
+        }
+    });
+
+    saving.value = false;
+};
+
+// Change password
+const changePassword = async () => {
+    if (!authStore.user?.id) return;
+
+    if (passwordForm.value.password !== passwordForm.value.password_confirmation) {
+        toast.add({
+            severity: 'error',
+            summary: c('common.validation_error', 'common') || 'خطأ في التحقق',
+            detail: 'تأكيد كلمة المرور غير مطابق',
+            life: 2500
+        });
+        return;
+    }
+
+    savingPassword.value = true;
+
+    const data = {
+        current_password: passwordForm.value.current_password,
+        password: passwordForm.value.password,
+        password_confirmation: passwordForm.value.password_confirmation
+    };
+
+    await apiCall({
+        endpoint: `users/${authStore.user.id}/password`,
+        method: 'put',
+        payload: data,
+        onSuccess: () => {
+            toastHandler.success(c('common.updated_successfully', 'common') || 'تم تحديث كلمة المرور بنجاح');
+            passwordForm.value = {
+                current_password: '',
+                password: '',
+                password_confirmation: ''
+            };
+        },
+        onError: (message) => {
+            toastHandler.error(message || c('common.messages.failed', 'common'));
+        }
+    });
+
+    savingPassword.value = false;
+};
+
+onMounted(() => {
+    loadProfile();
+});
+</script>
+
+<template>
+    <div class="max-sm:p-0 p-4">
+        <PageHeader
+            :title="c('profile.plural', 'common') || 'الملف الشخصي'"
+            :description="'إدارة بياناتك الشخصية وأدوارك وصلاحياتك'"
+        />
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <!-- Left: Image and quick info card -->
+            <Card class="shadow-md">
+                <template #content>
+                    <div class="p-5 space-y-5">
+                        <div class="flex items-center gap-4">
+                            <Avatar
+                                :image="imagePreview || undefined"
+                                :label="!imagePreview ? (authStore.user?.name?.charAt(0) || 'ع') : undefined"
+                                size="xlarge"
+                                shape="circle"
+                                class="border-4 border-primary-200"
+                            />
+                            <div>
+                                <div class="text-lg font-semibold">{{ authStore.user?.name || '-' }}</div>
+                                <div class="text-sm text-surface-500">{{ form.email || authStore.user?.email }}</div>
+                                <div class="text-sm text-surface-500">{{ authStore.user?.phone || '-' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </Card>
+
+            <!-- Right: Tabs -->
+            <div class="lg:col-span-2">
+                <Card class="shadow-md">
+                    <template #content>
+                        <Tabs :value="activeTab" @update:value="(v: any) => (activeTab = String(v))">
+                            <TabList>
+                                <Tab value="info">
+                                    <i class="pi pi-user mr-2"></i>
+                                    {{ c('profile.edit_data', 'profile') || 'تعديل البيانات' }}
+                                </Tab>
+                                <Tab value="password">
+                                    <i class="pi pi-lock mr-2"></i>
+                                    {{ c('profile.change_password', 'profile') || 'تغيير كلمة المرور' }}
+                                </Tab>
+                                <Tab value="permissions">
+                                    <i class="pi pi-key mr-2"></i>
+                                    {{ c('profile.view_permissions', 'profile') || 'عرض الصلاحيات' }}
+                                </Tab>
+                            </TabList>
+                            <TabPanels>
+                                <!-- Tab 1: Edit Data -->
+                                <TabPanel value="info">
+                                    <form @submit.prevent="saveProfile" class="space-y-4 p-5">
+                                        <!-- Image -->
+                                        <div class="flex items-center gap-4">
+                                            <Avatar
+                                                :image="imagePreview || undefined"
+                                                :label="!imagePreview ? (authStore.user?.name?.charAt(0) || 'ع') : undefined"
+                                                size="large"
+                                                shape="circle"
+                                                class="border-2 border-surface-200"
+                                            />
+                                            <FileUpload
+                                                accept="image/*"
+                                                mode="basic"
+                                                @select="handleImageSelect"
+                                                customUpload
+                                                auto
+                                                severity="secondary"
+                                                class="p-button-outlined"
+                                                chooseLabel="تغيير الصورة"
+                                                :maxFileSize="5242880"
+                                            />
+                                        </div>
+
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <!-- Name -->
+                                            <div>
+                                                <label class="mb-1 block text-sm font-medium">
+                                                    {{ c('user.fields.name', 'user') }}
+                                                </label>
+                                                <InputText v-model="form.name" class="w-full" />
+                                            </div>
+
+                                            <!-- Username -->
+                                            <div>
+                                                <label class="mb-1 block text-sm font-medium">
+                                                    {{ c('user.fields.username', 'user') }}
+                                                </label>
+                                                <InputText v-model="form.username" class="w-full" />
+                                            </div>
+
+                                            <!-- Email -->
+                                            <div>
+                                                <label class="mb-1 block text-sm font-medium">
+                                                    {{ c('user.fields.email', 'user') }}
+                                                </label>
+                                                <InputText v-model="form.email" type="email" class="w-full" />
+                                            </div>
+
+                                            <!-- Phone -->
+                                            <div>
+                                                <label class="mb-1 block text-sm font-medium">
+                                                    {{ c('user.fields.phone', 'user') }}
+                                                </label>
+                                                <InputText v-model="form.phone" class="w-full" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Save Button -->
+                                        <div class="flex justify-end pt-4">
+                                            <AppButton
+                                                type="submit"
+                                                :label="c('common.save', 'common')"
+                                                icon="pi pi-save"
+                                                :loading="saving"
+                                            />
+                                        </div>
+                                    </form>
+                                </TabPanel>
+
+                                <!-- Tab 2: Change Password -->
+                                <TabPanel value="password">
+                                    <form @submit.prevent="changePassword" class="space-y-4 p-5">
+                                        <!-- Hidden username field for password managers -->
+                                        <input
+                                            type="text"
+                                            :value="authStore.user?.email || authStore.user?.username || ''"
+                                            autocomplete="username"
+                                            style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0;"
+                                            tabindex="-1"
+                                            aria-hidden="true"
+                                        />
+                                        <!-- Current Password -->
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium">كلمة المرور الحالية</label>
+                                            <Password
+                                                v-model="passwordForm.current_password"
+                                                :feedback="false"
+                                                toggleMask
+                                                class="w-full"
+                                                inputClass="w-full"
+                                                :inputProps="{ autocomplete: 'current-password' }"
+                                            />
+                                        </div>
+
+                                        <!-- New Password -->
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium">كلمة المرور الجديدة</label>
+                                            <Password
+                                                v-model="passwordForm.password"
+                                                toggleMask
+                                                class="w-full"
+                                                inputClass="w-full"
+                                                :inputProps="{ autocomplete: 'new-password' }"
+                                            />
+                                        </div>
+
+                                        <!-- Confirm Password -->
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium">تأكيد كلمة المرور</label>
+                                            <Password
+                                                v-model="passwordForm.password_confirmation"
+                                                :feedback="false"
+                                                toggleMask
+                                                class="w-full"
+                                                inputClass="w-full"
+                                                :inputProps="{ autocomplete: 'new-password' }"
+                                            />
+                                        </div>
+
+                                        <!-- Save Button -->
+                                        <div class="flex justify-end pt-4">
+                                            <AppButton
+                                                type="submit"
+                                                label="تغيير كلمة المرور"
+                                                icon="pi pi-lock"
+                                                :loading="savingPassword"
+                                            />
+                                        </div>
+                                    </form>
+                                </TabPanel>
+
+                                <!-- Tab 3: View Permissions -->
+                                <TabPanel value="permissions">
+                                    <div class="p-5 space-y-6">
+                                        <!-- Roles -->
+                                        <div>
+                                            <h3 class="mb-3 text-lg font-semibold flex items-center gap-2">
+                                                <i class="pi pi-shield text-blue-600"></i>
+                                                {{ c('role.plural', 'role') || 'الأدوار' }}
+                                            </h3>
+                                            <div v-if="roles.length > 0" class="flex flex-wrap gap-2">
+                                                <Tag
+                                                    v-for="role in roles"
+                                                    :key="role.id"
+                                                    severity="info"
+                                                    class="text-sm px-3 py-2"
+                                                >
+                                                    {{ role.title }}
+                                                </Tag>
+                                            </div>
+                                            <div v-else class="text-gray-500 italic">
+                                                لا توجد أدوار
+                                            </div>
+                                        </div>
+
+                                        <!-- Permissions -->
+                                        <div>
+                                            <h3 class="mb-3 text-lg font-semibold flex items-center gap-2">
+                                                <i class="pi pi-key text-purple-600"></i>
+                                                {{ c('permission.plural', 'permission') || 'الصلاحيات' }}
+                                            </h3>
+                                            <div v-if="permissions.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                <div
+                                                    v-for="perm in permissions"
+                                                    :key="perm.id"
+                                                    class="flex flex-col gap-1 p-3 bg-purple-50 border border-purple-200 rounded"
+                                                >
+                                                    <div class="flex items-center gap-2">
+                                                        <i class="pi pi-check-circle text-purple-600"></i>
+                                                        <span class="text-sm font-semibold text-purple-900">{{ perm.name }}</span>
+                                                    </div>
+                                                    <span v-if="perm.title" class="text-xs text-purple-600 mr-6">{{ perm.title }}</span>
+                                                </div>
+                                            </div>
+                                            <div v-else class="text-gray-500 italic">
+                                                لا توجد صلاحيات
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TabPanel>
+                            </TabPanels>
+                        </Tabs>
+                    </template>
+                </Card>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script lang="ts">
+export default {
+    name: 'Profile'
+};
+</script>

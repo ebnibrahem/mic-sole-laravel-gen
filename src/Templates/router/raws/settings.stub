@@ -1,0 +1,34 @@
+import { RouteRecordRaw } from 'vue-router';
+import Settings from '@dashboard/pages/Settings.vue';
+import Profile from '@dashboard/pages/Profile.vue';
+
+const routes: RouteRecordRaw[] = [
+    {
+        path: '/profile',
+        name: 'profile',
+        component: Profile,
+        meta: {
+            label: 'profile',
+            requireAuth: true,
+            show_in_menu: true,
+            icon: 'pi pi-user-edit',
+            permissions: ['profile_edit'],
+        },
+    },
+    {
+        path: '/settings',
+        name: 'settings',
+        component: Settings,
+        meta: {
+            label: 'setting',
+            requireAuth: true,
+            show_in_menu: false,
+            icon: 'pi pi-cog',
+            permissions: ['setting_access'],
+            order: 4,
+        },
+    },
+];
+
+export default routes;
+

@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\RoleService;
+use App\Http\Requests\RoleRequest;
+use App\Http\Resources\RoleResource;
+use Illuminate\Http\Request;
+
+class RoleController extends Controller
+{
+    protected $service;
+
+    public function __construct(RoleService $service)
+    {
+        $this->service = $service;
+    }
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        $result = $this->service->index($request);
+        return $this->apiResponsePaginate(
+            data: $result['data'],
+            meta: $result['meta'],
+            options: $result['options'] ?? [],
+            message: 'تم جلب البيانات بنجاح'
+        );
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(RoleRequest $request)
+    {
+        $item = $this->service->create($request->validated());
+        return $this->apiResponse(
+            data: new RoleResource($item),
+            message: 'تم الإنشاء بنجاح'
+        );
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show($id)
+    {
+        $item = $this->service->show($id);
+        return $this->apiResponse(
+            data: new RoleResource($item),
+            message: 'تم جلب البيانات بنجاح'
+        );
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(RoleRequest $request, $id)
+    {
+        $item = $this->service->update($id, $request->validated());
+        return $this->apiResponse(
+            data: new RoleResource($item),
+            message: 'تم التحديث بنجاح'
+        );
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy($id)
+    {
+        $this->service->delete($id);
+        return $this->apiResponse(
+            data: [],
+            message: 'تم الحذف بنجاح'
+        );
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     */
+    public function destroyMultiple(Request $request)
+    {
+        $this->service->multipleDelete($request->ids ?? []);
+        return $this->apiResponse(
+            data: [],
+            message: 'تم الحذف بنجاح'
+        );
+    }
+
+    /**
+     * Activate multiple resources.
+     */
+    public function bulkActivate(Request $request)
+    {
+        $count = $this->service->bulkActivate($request->ids ?? []);
+        return $this->apiResponse(
+            data: ['count' => $count],
+            message: "تم تفعيل {$count} سجل بنجاح"
+        );
+    }
+
+    /**
+     * Deactivate multiple resources.
+     */
+    public function bulkDeactivate(Request $request)
+    {
+        $count = $this->service->bulkDeactivate($request->ids ?? []);
+        return $this->apiResponse(
+            data: ['count' => $count],
+            message: "تم تعطيل {$count} سجل بنجاح"
+        );
+    }
+}

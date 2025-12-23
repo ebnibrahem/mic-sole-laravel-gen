@@ -1,0 +1,28 @@
+import { RouteRecordRaw } from "vue-router";
+import auth from './raws/auth';
+import dashboard from "./raws/dashboard";
+import authorization from "./raws/authorization";
+import settings from "./raws/settings";
+import NotFound from '@dashboard/pages/404.vue';
+// Import model routes here
+// import {{modelNamePluralLower}} from "./raws/{{modelNamePluralLower}}";
+
+const routes: RouteRecordRaw[] = [
+    ...auth,
+    ...dashboard,
+    ...authorization,
+    ...settings,
+    // Add model routes here
+    // ...{{modelNamePluralLower}},
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        component: NotFound,
+        meta: {
+            show_in_menu: false,
+        },
+    },
+];
+
+export default routes;
+

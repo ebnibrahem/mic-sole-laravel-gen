@@ -1,0 +1,124 @@
+@props(['title', 'subtitle'])
+
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
+
+@php
+    // Logo is always at /images/logo.png (fixed path)
+    $logo = '/images/logo.png';
+    // Favicon is always at /favicon.ico (fixed path in public root)
+    $favicon = '/favicon.ico';
+@endphp
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>{{ $title ?? config('app.name', 'Laravel') }}</title>
+
+    <link rel="icon" href="{{ $favicon }}" sizes="any">
+    <link rel="icon" href="{{ $favicon }}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{{ $logo }}">
+
+    {{-- Google Fonts - Arabic Fonts --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    @vite(['resources/css/app.css'])
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased" style="background: var(--background);">
+    <div class="min-h-screen flex">
+        {{-- Left Column - Gradient Background --}}
+        <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-500 via-primary-600 to-primary-800 relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-black/15 via-black/10 to-black/15"></div>
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.1)_0%,transparent_50%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,0.1)_0%,transparent_50%),radial-gradient(circle_at_40%_20%,rgba(255,255,255,0.05)_0%,transparent_50%)]"></div>
+            <div class="relative z-10 flex flex-col justify-center items-center text-white p-12 w-full">
+                {{-- Logo --}}
+                <div class="mb-8">
+                    <img
+                        class="h-24 w-auto max-w-full object-contain rounded-lg shadow-xl bg-white/10 backdrop-blur-sm p-4"
+                        src="{{ $logo }}"
+                        alt="{{ config('app.name') }}"
+                        onerror="this.onerror=null; this.src='/images/logo.png';"
+                    >
+                </div>
+
+                {{-- Welcome Text --}}
+                <div class="text-center space-y-4 max-w-md">
+                    <h1 class="text-4xl font-bold mb-4">{{ config('app.name', 'Laravel') }}</h1>
+                    <p class="text-lg text-white/90 leading-relaxed">
+                        {{ $subtitle ?? 'مرحباً بك في لوحة التحكم' }}
+                    </p>
+                    <div class="mt-8 pt-8 border-t border-white/20">
+                        <p class="text-sm text-white/80">
+                            نظام إدارة متكامل مبني على Laravel 12 مع Vue 3 Dashboard
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Decorative Elements --}}
+                <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                    <div class="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+                    <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Right Column - Login Form --}}
+        <div class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12 bg-background">
+            <div class="w-full max-w-md space-y-8">
+                {{-- Mobile Logo --}}
+                <div class="text-center lg:hidden mb-8">
+                    <img
+                        class="mx-auto h-20 w-auto max-w-full object-contain rounded-lg"
+                        src="{{ $logo }}"
+                        alt="{{ config('app.name') }}"
+                        onerror="this.onerror=null; this.src='/images/logo.png';"
+                    >
+                    <h2 class="mt-4 text-2xl font-bold text-foreground">
+                        {{ $title ?? 'تسجيل الدخول' }}
+                    </h2>
+                    @if(isset($subtitle))
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        {{ $subtitle }}
+                    </p>
+                    @endif
+                </div>
+
+                {{-- Desktop Title --}}
+                <div class="hidden lg:block mb-8">
+                    <h2 class="text-3xl font-bold mb-2 text-foreground">
+                        {{ $title ?? 'تسجيل الدخول' }}
+                    </h2>
+                    @if(isset($subtitle))
+                    <p class="text-sm text-muted-foreground">
+                        {{ $subtitle }}
+                    </p>
+                    @endif
+                </div>
+
+                {{-- Form Card --}}
+                <div class="rounded-2xl p-8 shadow-xl border bg-card border-border">
+                    {{ $slot }}
+                </div>
+
+                {{-- Footer --}}
+                <div class="text-center text-sm text-muted-foreground">
+                    <p>&copy; {{ date('Y') }} {{ config('app.name') }}. جميع الحقوق محفوظة.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+

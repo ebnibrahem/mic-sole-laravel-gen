@@ -1,0 +1,29 @@
+<script lang="ts" setup>
+import { useRouter } from 'vue-router';
+import { c } from '@dashboard/utilities/langHelper';
+
+const router = useRouter();
+
+const goHome = () => {
+    router.push({ name: 'dashboard' });
+};
+</script>
+
+<template>
+    <div class="flex flex-col items-center justify-center min-h-screen p-4">
+        <div class="text-center">
+            <h1 class="text-9xl font-bold text-primary-500 mb-4">404</h1>
+            <h2 class="text-3xl font-semibold mb-4">{{ c('common.not_found', 'common') || 'الصفحة غير موجودة' }}</h2>
+            <p class="text-gray-600 mb-8">
+                {{ c('common.page_not_found', 'common') || 'عذراً، الصفحة التي تبحث عنها غير موجودة.' }}
+            </p>
+            <AppButton
+                :label="c('common.back', 'common') || 'العودة للرئيسية'"
+                icon="pi pi-home"
+                @click="goHome"
+                severity="primary"
+            />
+        </div>
+    </div>
+</template>
+

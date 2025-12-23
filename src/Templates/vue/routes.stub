@@ -1,0 +1,47 @@
+// Vue Router routes for {{modelName}}
+
+import { RouteRecordRaw } from 'vue-router';
+import {{modelNamePlural}} from '@dashboard/pages/{{modelNamePlural}}.vue';
+import {{modelName}}Create from '@dashboard/pages/{{modelName}}Create.vue';
+import {{modelName}} from '@dashboard/pages/{{modelName}}.vue';
+
+const routes: RouteRecordRaw[] = [
+    {
+        path: '/{{modelNamePluralLower}}',
+        name: '{{modelNamePluralLower}}.index',
+        component: {{modelNamePlural}},
+        meta: {
+            label: '{{modelNameLower}}.plural',
+            requireAuth: true,
+            show_in_menu: true,
+            icon: 'pi pi-list',
+            permissions: ['{{modelNameLower}}_view'],
+            order: 10,
+        },
+    },
+    {
+        path: '/{{modelNamePluralLower}}/do/create',
+        name: '{{modelNamePluralLower}}.create',
+        component: {{modelName}}Create,
+        meta: {
+            label: '{{modelNameLower}}.create',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['{{modelNameLower}}_create'],
+        },
+    },
+    {
+        path: '/{{modelNamePluralLower}}/:id',
+        name: '{{modelNamePluralLower}}.show',
+        component: {{modelName}},
+        meta: {
+            label: '{{modelNameLower}}.singular',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['{{modelNameLower}}_view'],
+        },
+    },
+];
+
+export default routes;
+

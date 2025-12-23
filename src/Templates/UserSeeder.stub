@@ -1,0 +1,47 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
+
+class UserSeeder extends Seeder
+{
+    public function run(): void
+    {
+                // Create admin user
+        User::firstOrCreate(
+            ['email' => 'admin@app.com'],
+            [
+                'name' => 'Admin',
+                'username' => 'admin',
+                'email' => 'admin@app.com',
+                'password' => Hash::make('password'),
+                'phone' => null,
+                'clan' => 'user',
+                'bio' => null,
+                'address' => null,
+                'image' => null,
+                'is_active' => true,
+            ]
+        );
+
+        // Create test user
+        User::firstOrCreate(
+            ['email' => 'test@app.com'],
+            [
+                'name' => 'Test User',
+                'username' => 'testuser',
+                'email' => 'test@app.com',
+                'password' => Hash::make('password'),
+                'phone' => null,
+                'clan' => 'customer',
+                'bio' => null,
+                'address' => null,
+                'image' => null,
+                'is_active' => true,
+            ]
+        );
+    }
+}

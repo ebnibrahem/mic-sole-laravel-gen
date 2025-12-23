@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\{{modelName}}Service;
+use App\Http\Requests\{{modelName}}Request;
+use App\Http\Resources\{{modelName}}Resource;
+use Illuminate\Http\Request;
+
+class {{modelName}}Controller extends Controller
+{
+    protected $service;
+
+    public function __construct({{modelName}}Service $service)
+    {
+        $this->service = $service;
+    }
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        $result = $this->service->index($request);
+        return $this->apiResponsePaginate(
+            data: $result['data'],
+            meta: $result['meta'],
+            options: $result['options'] ?? [],
+            message: 'تم جلب البيانات بنجاح'
+        );
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store({{modelName}}Request $request)
+    {
+        $item = $this->service->create($request->validated());
+        return $this->apiResponse(
+            data: new {{modelName}}Resource($item),
+            message: 'تم الإنشاء بنجاح'
+        );
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show($id)
+    {
+        $item = $this->service->show($id);
+        return $this->apiResponse(
+            data: new {{modelName}}Resource($item),
+            message: 'تم جلب البيانات بنجاح'
+        );
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update({{modelName}}Request $request, $id)
+    {
+        $item = $this->service->update($id, $request->validated());
+        return $this->apiResponse(
+            data: new {{modelName}}Resource($item),
+            message: 'تم التحديث بنجاح'
+        );
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy($id)
+    {
+        $this->service->delete($id);
+        return $this->apiResponse(
+            data: [],
+            message: 'تم الحذف بنجاح'
+        );
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     */
+    public function destroyMultiple(Request $request)
+    {
+        $this->service->multipleDelete($request->ids ?? []);
+        return $this->apiResponse(
+            data: [],
+            message: 'تم الحذف بنجاح'
+        );
+    }
+
+    /**
+     * Activate multiple resources.
+     */
+    public function bulkActivate(Request $request)
+    {
+        $count = $this->service->bulkActivate($request->ids ?? []);
+        return $this->apiResponse(
+            data: ['count' => $count],
+            message: "تم تفعيل {$count} سجل بنجاح"
+        );
+    }
+
+    /**
+     * Deactivate multiple resources.
+     */
+    public function bulkDeactivate(Request $request)
+    {
+        $count = $this->service->bulkDeactivate($request->ids ?? []);
+        return $this->apiResponse(
+            data: ['count' => $count],
+            message: "تم تعطيل {$count} سجل بنجاح"
+        );
+    }
+}

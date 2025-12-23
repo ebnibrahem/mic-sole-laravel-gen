@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Permission;
+use App\Models\User;
+
+class Role extends Model
+{
+    use HasFactory;
+
+    protected $table = 'roles';
+
+    protected $fillable = [
+        'title',
+    ];
+
+    protected $casts = [
+
+    ];
+
+    /**
+     * Prepare a date for array / JSON serialization.
+     *
+     * @param  \DateTimeInterface  $date
+     * @return string
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Relationships
+     */
+    /**
+     * Get the permission collection for this Role (many-to-many).
+     */
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class, 'permission_role', 'role_id', 'permission_id');
+    }
+
+    /**
+     * Get the user collection for this Role (many-to-many).
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'role_user', 'role_id', 'user_id');
+    }
+}

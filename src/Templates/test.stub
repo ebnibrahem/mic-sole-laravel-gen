@@ -1,0 +1,117 @@
+<?php
+
+use App\Models\{{modelName}};
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
+
+beforeEach(function () {
+    // Create a test user for authentication
+    $this->user = User::factory()->create();
+    $this->actingAs($this->user, 'sanctum');
+});
+
+test('can create {{modelNameLower}} via API', function () {
+    $data = [
+        {{fieldsForTest}}
+    ];
+
+    $response = $this->postJson('/api/v1/{{modelNamePluralLower}}', $data);
+
+    $response->assertStatus(201)
+        ->assertJsonStructure([
+            'data' => [
+                'id',
+                {{fieldsForTestAssert}}
+                'created_at',
+                'updated_at',
+            ],
+        ]);
+
+    $this->assertDatabaseHas('{{tableName}}', [
+        {{fieldsForTestDatabase}}
+    ]);
+});
+
+{{testWithRelationships}}
+
+test('can list {{modelNamePluralLower}} via API', function () {
+    {{modelName}}::factory()->count(5)->create();
+
+    $response = $this->getJson('/api/v1/{{modelNamePluralLower}}');
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'data' => [
+                '*' => [
+                    'id',
+                    {{fieldsForTableAssert}}
+                    'created_at',
+                    'updated_at',
+                ],
+            ],
+            'meta',
+        ]);
+});
+
+test('can show {{modelNameLower}} via API', function () {
+    ${{modelNameLower}} = {{modelName}}::factory()->create();
+
+    $response = $this->getJson("/api/v1/{{modelNamePluralLower}}/{${{modelNameLower}}->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'data' => [
+                'id',
+                {{fieldsForTestAssert}}
+                'created_at',
+                'updated_at',
+            ],
+        ]);
+});
+
+test('can update {{modelNameLower}} via API', function () {
+    ${{modelNameLower}} = {{modelName}}::factory()->create();
+
+    $data = [
+        {{fieldsForTestUpdate}}
+    ];
+
+    $response = $this->putJson("/api/v1/{{modelNamePluralLower}}/{${{modelNameLower}}->id}", $data);
+
+    $response->assertStatus(200);
+
+    $this->assertDatabaseHas('{{tableName}}', [
+        'id' => ${{modelNameLower}}->id,
+        {{fieldsForTestUpdateDatabase}}
+    ]);
+});
+
+test('can delete {{modelNameLower}} via API', function () {
+    ${{modelNameLower}} = {{modelName}}::factory()->create();
+
+    $response = $this->deleteJson("/api/v1/{{modelNamePluralLower}}/{${{modelNameLower}}->id}");
+
+    $response->assertStatus(200);
+
+    $this->assertDatabaseMissing('{{tableName}}', [
+        'id' => ${{modelNameLower}}->id,
+    ]);
+});
+
+test('can bulk delete {{modelNamePluralLower}} via API', function () {
+    ${{modelNamePluralLower}} = {{modelName}}::factory()->count(3)->create();
+    $ids = ${{modelNamePluralLower}}->pluck('id')->toArray();
+
+    $response = $this->postJson('/api/v1/{{modelNamePluralLower}}/bulk-delete', [
+        'ids' => $ids,
+    ]);
+
+    $response->assertStatus(200);
+
+    foreach ($ids as $id) {
+        $this->assertDatabaseMissing('{{tableName}}', ['id' => $id]);
+    }
+});

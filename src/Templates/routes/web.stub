@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+//website application routes here
+Route::get('/', function () {
+    return view('welcome');
+});
+
+
+// Auth Routes
+require __DIR__.'/auth.php';
+
+// CRUD Generator Routes
+require __DIR__.'/mic-sole-route.php';
+
+// Catch-all route for Vue Router (SPA) - must be after all other routes
+// This allows Vue Router to handle all client-side routing
+// Excludes /login and /logout to allow public access and logout functionality
+// No Laravel auth middleware needed - Vue Router handles authentication
+Route::get('/{any}', function () {
+    return view('dashboard');
+})->where('any', '^(?!login|logout|api|storage|images|css|js|fonts).*');

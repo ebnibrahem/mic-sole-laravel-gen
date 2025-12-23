@@ -1,0 +1,147 @@
+import type { PrimeVueLocaleOptions } from 'primevue/config';
+
+/**
+ * PrimeVue Arabic Locale Configuration
+ * ترجمة عربية كاملة لجميع مكونات PrimeVue
+ */
+export const primeVueArabicLocale: PrimeVueLocaleOptions = {
+    // Basic Actions
+    accept: "أوافق",
+    reject: "رفض",
+    cancel: "إلغاء",
+    choose: "اختر",
+    upload: "رفع",
+    completed: "مكتمل",
+    pending: "قيد الانتظار",
+
+    // Filter Options
+    startsWith: "يبدأ بـ",
+    contains: "يحتوي على",
+    notContains: "لا يحتوي على",
+    endsWith: "ينتهي بـ",
+    equals: "يساوي",
+    notEquals: "لا يساوي",
+    noFilter: "بدون فلتر",
+    lt: "أقل من",
+    lte: "أقل من أو يساوي",
+    gt: "أكبر من",
+    gte: "أكبر من أو يساوي",
+    dateIs: "التاريخ هو",
+    dateIsNot: "التاريخ ليس",
+    dateBefore: "التاريخ قبل",
+    dateAfter: "التاريخ بعد",
+    clear: "مسح",
+    apply: "تطبيق",
+    matchAll: "مطابقة الكل",
+    matchAny: "مطابقة أي",
+    addRule: "إضافة قاعدة",
+    removeRule: "إزالة قاعدة",
+
+    // Date Picker
+    dayNames: ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
+    dayNamesShort: ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"],
+    dayNamesMin: ["ح", "ن", "ث", "ر", "خ", "ج", "س"],
+    monthNames: [
+        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+    ],
+    monthNamesShort: [
+        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+    ],
+    chooseYear: "اختر السنة",
+    chooseMonth: "اختر الشهر",
+    chooseDate: "اختر التاريخ",
+    prevDecade: "العقد السابق",
+    nextDecade: "العقد التالي",
+    prevYear: "السنة السابقة",
+    nextYear: "السنة التالية",
+    prevMonth: "الشهر السابق",
+    nextMonth: "الشهر التالي",
+    prevHour: "الساعة السابقة",
+    nextHour: "الساعة التالية",
+    prevMinute: "الدقيقة السابقة",
+    nextMinute: "الدقيقة التالية",
+    prevSecond: "الثانية السابقة",
+    nextSecond: "الثانية التالية",
+    am: "ص",
+    pm: "م",
+    today: "اليوم",
+    weekHeader: "أسبوع",
+    firstDayOfWeek: 6, // السبت
+    showMonthAfterYear: false,
+    dateFormat: "dd/mm/yy",
+
+    // Password Strength
+    weak: "ضعيف",
+    medium: "متوسط",
+    strong: "قوي",
+    passwordPrompt: "أدخل كلمة المرور",
+
+    // Messages
+    emptyFilterMessage: "لا يوجد نتائج",
+    searchMessage: "يوجد {0} نتائج",
+    selectionMessage: "تم اختيار {0} عنصر",
+    emptySelectionMessage: "لم يتم اختيار أي عنصر",
+    emptySearchMessage: "لا توجد نتائج",
+    emptyMessage: "لا توجد خيارات متاحة",
+    fileChosenMessage: "تم اختيار {0} ملف",
+    noFileChosenMessage: "لم يتم اختيار أي ملف",
+    fileSizeTypes: ["بايت", "كيلوبايت", "ميجابايت", "جيجابايت", "تيرابايت"],
+
+    // ARIA Labels
+    aria: {
+        trueLabel: "صحيح",
+        falseLabel: "خاطئ",
+        nullLabel: "غير محدد",
+        star: "نجمة واحدة",
+        stars: "{star} نجوم",
+        selectAll: "تحديد الكل",
+        unselectAll: "إلغاء تحديد الكل",
+        close: "إغلاق",
+        previous: "السابق",
+        next: "التالي",
+        navigation: "التنقل",
+        scrollTop: "التمرير للأعلى",
+        moveUp: "نقل لأعلى",
+        moveTop: "نقل للأعلى",
+        moveDown: "نقل لأسفل",
+        moveBottom: "نقل للأسفل",
+        moveToTarget: "نقل للهدف",
+        moveToSource: "نقل للمصدر",
+        moveAllToTarget: "نقل الكل للهدف",
+        moveAllToSource: "نقل الكل للمصدر",
+        pageLabel: "الصفحة {page}",
+        firstPageLabel: "الصفحة الأولى",
+        lastPageLabel: "الصفحة الأخيرة",
+        nextPageLabel: "الصفحة التالية",
+        prevPageLabel: "الصفحة السابقة",
+        rowsPerPageLabel: "عدد الصفوف في الصفحة",
+        jumpToPageDropdownLabel: "الانتقال للصفحة",
+        jumpToPageInputLabel: "رقم الصفحة",
+        selectRow: "تحديد الصف",
+        unselectRow: "إلغاء تحديد الصف",
+        expandRow: "توسيع الصف",
+        collapseRow: "طي الصف",
+        showFilterMenu: "عرض قائمة الفلتر",
+        hideFilterMenu: "إخفاء قائمة الفلتر",
+        filterOperator: "معامل الفلتر",
+        filterConstraint: "قيد الفلتر",
+        editRow: "تعديل الصف",
+        saveEdit: "حفظ التعديل",
+        cancelEdit: "إلغاء التعديل",
+        listView: "عرض القائمة",
+        gridView: "عرض الشبكة",
+        slide: "شريحة",
+        slideNumber: "شريحة {slideNumber}",
+        zoomImage: "تكبير الصورة",
+        zoomIn: "تكبير",
+        zoomOut: "تصغير",
+        rotateRight: "تدوير لليمين",
+        rotateLeft: "تدوير لليسار",
+        listLabel: "قائمة",
+    },
+};
+
+export default primeVueArabicLocale;
+

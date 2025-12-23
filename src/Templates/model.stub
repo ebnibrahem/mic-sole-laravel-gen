@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+{{relationshipImports}}
+
+class {{modelName}} extends Model
+{
+    use HasFactory;
+
+    protected $table = '{{tableName}}';
+
+    protected $fillable = [
+        {{fieldsForFillable}}{{relationshipForeignKeys}}
+    ];
+
+    protected $casts = [
+        {{fieldsForCasts}}
+    ];
+
+    /**
+     * Prepare a date for array / JSON serialization.
+     *
+     * @param  \DateTimeInterface  $date
+     * @return string
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Relationships
+     */
+{{relationships}}
+}

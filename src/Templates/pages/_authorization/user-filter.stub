@@ -1,0 +1,165 @@
+<script setup lang="ts">
+import { c } from '@shared/libs/filters';
+import { ref, watch } from 'vue';
+
+interface Props {
+    loading?: boolean;
+}
+
+interface Emits {
+    (e: 'filter-change', filters: any): void;
+    (e: 'search', searchTerm: string): void;
+    (e: 'reset'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    loading: false
+});
+
+const emit = defineEmits<Emits>();
+
+// Filter state
+const filters = ref({
+    clan: '',
+    is_active: '',
+    date_from: null as Date | null,
+    date_to: null as Date | null
+});
+
+const searchTerm = ref('');
+
+// Clan options
+const clanOptions = [
+    { label: c('user.clan.all'), value: '' },
+    { label: c('user.clan.user'), value: 'user' },
+    { label: c('user.clan.customer'), value: 'customer' }
+];
+
+// Status options
+const statusOptions = [
+    { label: c('common.all', 'common'), value: '' },
+    { label: c('common.active', 'common'), value: '1' },
+    { label: c('common.inactive', 'common'), value: '0' }
+];
+
+// Watch for filter changes
+watch(filters, (newFilters) => {
+    emit('filter-change', newFilters);
+}, { deep: true });
+
+// Watch for search term changes
+watch(searchTerm, (newSearchTerm) => {
+    emit('search', newSearchTerm);
+});
+
+// Reset filters
+const resetFilters = () => {
+    filters.value = {
+        clan: '',
+        is_active: '',
+        date_from: null,
+        date_to: null
+    };
+    searchTerm.value = '';
+    emit('reset');
+};
+
+// Apply filters
+const applyFilters = () => {
+    emit('filter-change', filters.value);
+};
+</script>
+
+<template>
+    <div class="bg-white border-b border-gray-200 px-4 py-3">
+        <div class="flex flex-wrap items-center gap-4">
+            <!-- Search Input -->
+            <div class="flex-1 min-w-64">
+                <div class="relative">
+                    <i class="pi pi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <InputText
+                        v-model="searchTerm"
+                        :placeholder="c('user.search_placeholder')"
+                        class="w-full pl-10 pr-4"
+                        :disabled="loading"
+                    />
+                </div>
+            </div>
+
+            <!-- Clan Filter -->
+            <div class="min-w-48">
+                <Select
+                    v-model="filters.clan"
+                    :options="clanOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="c('user.fields.clan')"
+                    class="w-full"
+                    :disabled="loading"
+                />
+            </div>
+
+            <!-- Status Filter -->
+            <div class="min-w-48">
+                <Select
+                    v-model="filters.is_active"
+                    :options="statusOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="c('user.fields.is_active')"
+                    class="w-full"
+                    :disabled="loading"
+                />
+            </div>
+
+            <!-- Date From -->
+            <div class="min-w-48">
+                <DatePicker
+                    v-model="filters.date_from"
+                    :placeholder="c('user.date_from')"
+                    class="w-full"
+                    :disabled="loading"
+                    dateFormat="yy-mm-dd"
+                />
+            </div>
+
+            <!-- Date To -->
+            <div class="min-w-48">
+                <DatePicker
+                    v-model="filters.date_to"
+                    :placeholder="c('user.date_to')"
+                    class="w-full"
+                    :disabled="loading"
+                    dateFormat="yy-mm-dd"
+                />
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <AppButton
+                    :label="c('common.apply')"
+                    icon="pi pi-filter"
+                    size="small"
+                    @click="applyFilters"
+                    :loading="loading"
+                />
+                <AppButton
+                    :label="c('common.reset')"
+                    icon="pi pi-refresh"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    @click="resetFilters"
+                    :disabled="loading"
+                />
+            </div>
+        </div>
+    </div>
+</template>
+
+<script lang="ts">
+export default {
+    name: 'UserFilter'
+};
+</script>
+

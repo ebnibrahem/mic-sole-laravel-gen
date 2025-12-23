@@ -1,0 +1,208 @@
+<script lang="ts" setup>
+import { ref, watch, computed } from "vue";
+import { useToast } from "primevue/usetoast";
+import { c } from "@shared/libs/filters";
+import type { {{modelName}} } from "@shared/types/{{modelNameLower}}";
+{{tipTapEditorImport}}
+
+interface Props {
+    {{modelNameLower}}?: {{modelName}} | null;
+    loading?: boolean;
+    isEdit?: boolean;
+}
+
+interface Emits {
+    (e: 'submit', data: any, callbacks?: { onSuccess: (data?: {{modelName}}) => void; onError: () => void }): void;
+    (e: 'cancel'): void;
+    (e: 'saved', {{modelNameLower}}: {{modelName}}): void;
+    (e: 'error', error: any): void;
+    (e: 'reset'): void;
+    (e: 'go-to-list'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    {{modelNameLower}}: null,
+    loading: false,
+    isEdit: false
+});
+
+const emit = defineEmits<Emits>();
+const toast = useToast();
+
+// Form data
+const local{{modelName}} = ref({
+{{formInitialValues}}
+});
+
+const errors = ref<Record<string, string>>({});
+const internalLoading = ref(false);
+const submitted = ref(false);
+const goToListAfterAction = ref(false);
+const addAnother = ref(false);
+
+// Watch for prop changes
+watch(() => props.{{modelNameLower}}, (newValue) => {
+    submitted.value = false;
+    errors.value = {};
+    if (newValue) {
+        local{{modelName}}.value = { ...newValue };
+    } else {
+        resetForm();
+    }
+}, { immediate: true });
+
+// Reset form
+const resetForm = () => {
+    local{{modelName}}.value = {
+{{formInitialValues}}
+    };
+    errors.value = {};
+    submitted.value = false;
+    emit('reset');
+};
+
+// Form validation
+const isFormValid = computed(() => {
+    // Add validation logic here
+    // Example:
+    // return local{{modelName}}.value.name?.trim() !== '' && local{{modelName}}.value.email?.trim() !== '';
+    return true;
+});
+
+// Submit form
+const handleSubmit = async () => {
+    if (!isFormValid.value) {
+        toast.add({
+            severity: 'warn',
+            summary: c('common.warning', 'common'),
+            detail: c('common.fill_required_fields', 'common'),
+            life: 3000,
+        });
+        return;
+    }
+
+    // Prevent double submission
+    if (internalLoading.value) {
+        return;
+    }
+
+    internalLoading.value = true;
+    errors.value = {};
+    submitted.value = true;
+
+    // Create FormData for file upload
+    const formData = new FormData();
+
+    // Add form fields to FormData
+    Object.keys(local{{modelName}}.value).forEach((key) => {
+        const value = (local{{modelName}}.value as any)[key];
+        if (value !== null && value !== undefined && value !== '') {
+            if (Array.isArray(value)) {
+                value.forEach((item: any) => {
+                    formData.append(`${key}[]`, item.toString());
+                });
+            } else if (value instanceof File) {
+                formData.append(key, value);
+            } else {
+                formData.append(key, value.toString());
+            }
+        }
+    });
+
+    // For PUT requests, add _method
+    if (props.isEdit) {
+        formData.append('_method', 'PUT');
+    }
+
+    // Emit submit event to parent - let parent handle the API call
+    emit('submit', formData, {
+        onSuccess: (data?: {{modelName}}) => {
+            internalLoading.value = false;
+            // Emit saved event with updated data if provided
+            if (data) {
+                emit('saved', data);
+            }
+            // If goToListAfterAction is checked, emit event to go to list
+            if (goToListAfterAction.value) {
+                emit('go-to-list');
+            } else if (!props.isEdit) {
+                // If addAnother is checked, reset form for adding another
+                if (addAnother.value) {
+                    resetForm();
+                    addAnother.value = false;
+                } else {
+                    resetForm();
+                }
+            }
+        },
+        onError: () => {
+            internalLoading.value = false;
+        }
+    });
+};
+
+// Save and add another
+const handleSaveAndAddAnother = async () => {
+    addAnother.value = true;
+    await handleSubmit();
+};
+
+// Cancel form
+const handleCancel = () => {
+    submitted.value = false;
+    errors.value = {};
+    emit('cancel');
+};
+</script>
+
+<template>
+    <form @submit.prevent="handleSubmit" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+{{formFields}}
+        </div>
+
+        <!-- Go to list after action -->
+        <div class="flex items-center space-x-2">
+            <Checkbox
+                v-model="goToListAfterAction"
+                :binary="true"
+                inputId="go-to-list"
+            />
+            <label for="go-to-list" class="text-sm text-gray-700 cursor-pointer">
+                {{ c('common.go_to_list_after_action', 'common') }}
+            </label>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <AppButton
+                type="button"
+                :label="c('common.cancel', 'common')"
+                icon="pi pi-times"
+                severity="secondary"
+                outlined
+                @click="handleCancel"
+                :disabled="internalLoading"
+            />
+            <AppButton
+                v-if="!isEdit"
+                type="button"
+                :label="c('common.add_another', 'common')"
+                icon="pi pi-plus-circle"
+                severity="info"
+                outlined
+                :loading="internalLoading"
+                :disabled="!isFormValid || internalLoading"
+                @click="handleSaveAndAddAnother"
+            />
+            <AppButton
+                type="submit"
+                :label="isEdit ? c('common.update', 'common') : c('common.create', 'common')"
+                icon="pi pi-check"
+                :loading="internalLoading"
+                :disabled="!isFormValid || internalLoading"
+            />
+        </div>
+    </form>
+</template>
+

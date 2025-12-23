@@ -1,0 +1,638 @@
+<script lang="ts" setup>
+import { ref, onMounted, watch, reactive } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { c } from '@dashboard/utilities/langHelper';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import type { User, Role, Permission } from '@shared/types/responses';
+import UserTable from './_authorization/users/table.vue';
+import RoleTable from './_authorization/roles/table.vue';
+import PermissionTable from './_authorization/permissions/table.vue';
+import RoleForm from './_authorization/role-form.vue';
+import PermissionForm from './_authorization/permission-form.vue';
+
+const router = useRouter();
+const route = useRoute();
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+
+// Data
+const users = ref<User[]>([]);
+const roles = ref<Role[]>([]);
+const permissions = ref<Permission[]>([]);
+const allPermissions = ref<Permission[]>([]); // For role form
+
+// Loading states
+const usersLoading = ref(false);
+const rolesLoading = ref(false);
+const permissionsLoading = ref(false);
+const allPermissionsLoading = ref(false); // For loading permissions in role form
+
+// Pagination
+const usersPagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0,
+});
+
+const rolesPagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0,
+});
+
+const permissionsPagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 50,
+    total: 0,
+    from: 0,
+    to: 0,
+});
+
+// Options
+const usersOptions = ref({
+    roles: [],
+});
+
+const rolesOptions = ref({
+    permissions: [],
+});
+
+const permissionsOptions = ref({});
+
+// Filters
+const usersFilters = reactive({
+    search: '',
+    clan: 'user',
+    role_id: undefined,
+    is_active: undefined,
+    sort_order: 'desc',
+});
+
+const rolesFilters = reactive({
+    search: '',
+    sort_order: 'desc',
+});
+
+const permissionsFilters = reactive({
+    search: '',
+    sort_order: 'desc',
+});
+
+// Role form dialog
+const roleFormVisible = ref(false);
+const editingRole = ref<Role | null>(null);
+const isEditMode = ref(false);
+
+// Permission form dialog
+const permissionFormVisible = ref(false);
+const editingPermission = ref<Permission | null>(null);
+const isPermissionEdit = ref(false);
+
+// تهيئة التبويب النشط من query parameter
+const activeTab = ref((route.query.tab as string) || 'users');
+
+// معالجة تغيير التبويب
+const handleTabChange = (tab: string | number) => {
+    const tabValue = tab as string;
+    activeTab.value = tabValue;
+
+    // تحديث URL مع query parameter
+    router.push({
+        name: 'authorization',
+        query: { tab: tabValue }
+    });
+
+    // تحميل البيانات للتبويب الجديد
+    if (tabValue === 'users' && users.value.length === 0) {
+        loadUsers();
+    } else if (tabValue === 'roles' && roles.value.length === 0) {
+        loadRoles();
+    } else if (tabValue === 'permissions' && permissions.value.length === 0) {
+        loadPermissions();
+    }
+};
+
+// مراقبة تغيير query parameter
+watch(() => route.query.tab, (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+        activeTab.value = newTab;
+
+        // تحميل البيانات للتبويب الجديد
+        if (newTab === 'users' && users.value.length === 0) {
+            loadUsers();
+        } else if (newTab === 'roles' && roles.value.length === 0) {
+            loadRoles();
+        } else if (newTab === 'permissions' && permissions.value.length === 0) {
+            loadPermissions();
+        }
+    }
+});
+
+// Role form handlers
+const openRoleForm = async (role?: Role) => {
+    if (role) {
+        isEditMode.value = true;
+        // Load role with permissions from API
+        await apiCall({
+            endpoint: `roles/${role.id}`,
+            method: 'get',
+            onSuccess: (data: Role) => {
+                editingRole.value = data;
+            },
+            onError: (message) => {
+                toast.add({
+                    severity: 'error',
+                    summary: c('common.error', 'common'),
+                    detail: message || c('common.error_occurred', 'common'),
+                    life: 3000,
+                });
+                // Fallback to the role from table if API fails
+                editingRole.value = role;
+            },
+        });
+    } else {
+        editingRole.value = null;
+        isEditMode.value = false;
+    }
+    roleFormVisible.value = true;
+    loadAllPermissions();
+};
+
+const loadAllPermissions = async () => {
+    allPermissionsLoading.value = true;
+    await apiCall({
+        endpoint: 'permissions',
+        method: 'get',
+        params: { per_page: 1000 },
+        onSuccessPaginate: (data: Permission[]) => {
+            allPermissions.value = data || [];
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+    allPermissionsLoading.value = false;
+};
+
+const handleRoleSave = async () => {
+    // RoleForm handles the API call internally
+    // Just reload the roles list
+    await loadRoles();
+};
+
+const handleRoleCancel = () => {
+    roleFormVisible.value = false;
+    editingRole.value = null;
+    isEditMode.value = false;
+};
+
+const openPermissionForm = (permission?: Permission) => {
+    if (permission) {
+        editingPermission.value = permission;
+        isPermissionEdit.value = true;
+    } else {
+        editingPermission.value = null;
+        isPermissionEdit.value = false;
+    }
+    permissionFormVisible.value = true;
+};
+
+const handlePermissionSave = async () => {
+    // PermissionForm handles the API call internally
+    // Just reload the permissions list
+    await loadPermissions();
+};
+
+const handlePermissionCancel = () => {
+    permissionFormVisible.value = false;
+    editingPermission.value = null;
+    isPermissionEdit.value = false;
+};
+
+// دوال جلب البيانات
+const loadUsers = async (customFilters: Record<string, any> = {}) => {
+    usersLoading.value = true;
+    // Update sort_order in filters if provided in customFilters
+    if (customFilters.sort_order) {
+        usersFilters.sort_order = customFilters.sort_order;
+    }
+    await apiCall({
+        endpoint: 'users',
+        method: 'get',
+        params: {
+            ...usersFilters,
+            ...customFilters,
+            page: usersPagination.value.current_page,
+            per_page: usersPagination.value.per_page,
+        },
+        onSuccessPaginate: (data: User[], meta: any, options: any) => {
+            users.value = data || [];
+            usersPagination.value = meta || usersPagination.value;
+            usersOptions.value = options || { roles: [] };
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+    usersLoading.value = false;
+};
+
+const loadRoles = async (customFilters: Record<string, any> = {}) => {
+    rolesLoading.value = true;
+    // Update sort_order in filters if provided in customFilters
+    if (customFilters.sort_order) {
+        rolesFilters.sort_order = customFilters.sort_order;
+    }
+    await apiCall({
+        endpoint: 'roles',
+        method: 'get',
+        params: {
+            ...rolesFilters,
+            ...customFilters,
+            page: rolesPagination.value.current_page,
+            per_page: rolesPagination.value.per_page,
+        },
+        onSuccessPaginate: (data: Role[], meta: any, options: any) => {
+            roles.value = data || [];
+            rolesPagination.value = meta || rolesPagination.value;
+            rolesOptions.value = options || { permissions: [] };
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+    rolesLoading.value = false;
+};
+
+const loadPermissions = async (customFilters: Record<string, any> = {}) => {
+    permissionsLoading.value = true;
+    if (customFilters.per_page !== undefined) {
+        permissionsPagination.value.per_page = customFilters.per_page as number;
+        permissionsPagination.value.current_page = 1;
+    }
+    if (customFilters.page !== undefined) {
+        permissionsPagination.value.current_page = customFilters.page as number;
+    }
+    // Update sort_order in filters if provided in customFilters
+    if (customFilters.sort_order) {
+        permissionsFilters.sort_order = customFilters.sort_order;
+    }
+    await apiCall({
+        endpoint: 'permissions',
+        method: 'get',
+        params: {
+            ...permissionsFilters,
+            ...customFilters,
+            page: permissionsPagination.value.current_page,
+            per_page: permissionsPagination.value.per_page,
+        },
+        onSuccessPaginate: (data: Permission[], meta: any, options: any) => {
+            permissions.value = data || [];
+            if (meta) {
+                permissionsPagination.value = {
+                    current_page: meta.current_page || 1,
+                    last_page: meta.last_page || 1,
+                    per_page: meta.per_page || permissionsPagination.value.per_page,
+                    total: meta.total || 0,
+                    from: meta.from || 0,
+                    to: meta.to || 0,
+                };
+            }
+            permissionsOptions.value = options || {};
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+    permissionsLoading.value = false;
+};
+
+// معالجات الحذف
+const handleUserDelete = async (user: User) => {
+    await apiCall({
+        endpoint: `users/${user.id}`,
+        method: 'delete',
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('user.messages.deleted', 'user'),
+                life: 3000,
+            });
+            loadUsers();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleUsersBulkDelete = async (userIds: number[]) => {
+    await apiCall({
+        endpoint: 'users/bulk-delete',
+        method: 'post',
+        payload: { ids: userIds },
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('user.messages.bulk_deleted', 'user'),
+                life: 3000,
+            });
+            loadUsers();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleRoleDelete = async (role: Role) => {
+    await apiCall({
+        endpoint: `roles/${role.id}`,
+        method: 'delete',
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('role.messages.deleted', 'role'),
+                life: 3000,
+            });
+            loadRoles();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handleRolesBulkDelete = async (roleIds: number[]) => {
+    await apiCall({
+        endpoint: 'roles/bulk-delete',
+        method: 'post',
+        payload: { ids: roleIds },
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('role.messages.bulk_deleted', 'role'),
+                life: 3000,
+            });
+            loadRoles();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handlePermissionDelete = async (permission: Permission) => {
+    await apiCall({
+        endpoint: `permissions/${permission.id}`,
+        method: 'delete',
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('permission.messages.deleted', 'permission'),
+                life: 3000,
+            });
+            loadPermissions();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+const handlePermissionsBulkDelete = async (permissionIds: number[]) => {
+    await apiCall({
+        endpoint: 'permissions/bulk-delete',
+        method: 'post',
+        payload: { ids: permissionIds },
+        onSuccess: () => {
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('permission.messages.bulk_deleted', 'permission'),
+                life: 3000,
+            });
+            loadPermissions();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+        },
+    });
+};
+
+// تحميل البيانات عند تحميل الصفحة
+onMounted(() => {
+    // تحميل البيانات للتبويب النشط فقط
+    if (activeTab.value === 'users') {
+        loadUsers();
+    } else if (activeTab.value === 'roles') {
+        loadRoles();
+    } else if (activeTab.value === 'permissions') {
+        loadPermissions();
+    }
+});
+</script>
+
+<template>
+    <div class="p-4">
+        <!-- Header -->
+        <PageHeader
+            :title="c('authorization.title', 'common') || 'إدارة الصلاحيات'"
+            :description="c('authorization.description', 'common') || 'إدارة المستخدمين والأدوار والصلاحيات'"
+            icon="pi pi-shield"
+        />
+
+        <!-- Tabs -->
+        <div class="card mt-4">
+            <Tabs :value="activeTab" @update:value="handleTabChange">
+                <TabList>
+                    <Tab value="users" class="flex items-center gap-2">
+                        <i class="pi pi-users"></i>
+                        {{ c('plural', 'user') }}
+                    </Tab>
+                    <Tab value="roles" class="flex items-center gap-2">
+                        <i class="pi pi-shield"></i>
+                        {{ c('plural', 'role') }}
+                    </Tab>
+                    <Tab value="permissions" class="flex items-center gap-2">
+                        <i class="pi pi-key"></i>
+                        {{ c('plural', 'permission') }}
+                    </Tab>
+                </TabList>
+                <TabPanels>
+                    <!-- Users Tab -->
+                    <TabPanel value="users">
+                        <div class="p-6 space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-semibold">{{ c('user.plural', 'user') }}</h2>
+                                <AppButton
+                                    :label="c('user.create', 'user') || 'إضافة مستخدم'"
+                                    icon="pi pi-user-plus"
+                                    @click="router.push({ name: 'users.create' })"
+                                    severity="success"
+                                    size="small"
+                                    :permissions="['user_create']"
+                                />
+                            </div>
+                            <UserTable
+                                :data="users"
+                                :loading="usersLoading"
+                                :pagination="usersPagination"
+                                :filters="usersFilters"
+                                :sortOrder="usersFilters.sort_order"
+                                :options="usersOptions"
+                                @load-data="loadUsers"
+                                @user-selected="(u: User) => router.push({ name: 'users.show', params: { id: u.id } })"
+                                @user-edit="(u: User) => router.push({ name: 'users.show', params: { id: u.id }, query: { tab: 'edit' } })"
+                                @user-delete="handleUserDelete"
+                                @bulk-delete="handleUsersBulkDelete"
+                            />
+                        </div>
+                    </TabPanel>
+
+                    <!-- Roles Tab -->
+                    <TabPanel value="roles">
+                        <div class="p-6 space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-semibold">{{ c('role.plural', 'role') }}</h2>
+                                <AppButton
+                                    :label="c('role.create', 'role') || 'إضافة دور'"
+                                    icon="pi pi-plus"
+                                    @click="openRoleForm()"
+                                    severity="success"
+                                    size="small"
+                                    :permissions="['role_create']"
+                                />
+                            </div>
+                            <RoleTable
+                                :data="roles"
+                                :loading="rolesLoading"
+                                :pagination="rolesPagination"
+                                :filters="rolesFilters"
+                                :sortOrder="rolesFilters.sort_order"
+                                :options="rolesOptions"
+                                @load-data="loadRoles"
+                                @role-edit="openRoleForm"
+                                @role-delete="handleRoleDelete"
+                                @bulk-delete="handleRolesBulkDelete"
+                            />
+                        </div>
+                    </TabPanel>
+
+                    <!-- Permissions Tab -->
+                    <TabPanel value="permissions">
+                        <div class="p-6 space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-semibold">{{ c('permission.plural', 'permission') }}</h2>
+                                <AppButton
+                                    :label="c('permission.create', 'permission') || 'إضافة صلاحية'"
+                                    icon="pi pi-plus"
+                                    @click="openPermissionForm()"
+                                    severity="success"
+                                    size="small"
+                                    :permissions="['permission_create']"
+                                />
+                            </div>
+                            <PermissionTable
+                                :data="permissions"
+                                :loading="permissionsLoading"
+                                :pagination="permissionsPagination"
+                                :filters="permissionsFilters"
+                                :sortOrder="permissionsFilters.sort_order"
+                                :options="permissionsOptions"
+                                @load-data="loadPermissions"
+                                @permission-edit="openPermissionForm"
+                                @permission-delete="handlePermissionDelete"
+                                @bulk-delete="handlePermissionsBulkDelete"
+                            />
+                        </div>
+                    </TabPanel>
+                </TabPanels>
+            </Tabs>
+        </div>
+
+        <!-- Role Form Dialog -->
+        <RoleForm
+            v-model:visible="roleFormVisible"
+            :role="editingRole"
+            :permissions="allPermissions"
+            :permissions-loading="allPermissionsLoading"
+            :is-edit="isEditMode"
+            @save="handleRoleSave"
+            @cancel="handleRoleCancel"
+        />
+
+        <!-- Permission Form Dialog -->
+        <PermissionForm
+            v-model:visible="permissionFormVisible"
+            :permission="editingPermission"
+            :is-edit="isPermissionEdit"
+            @save="handlePermissionSave"
+            @cancel="handlePermissionCancel"
+        />
+    </div>
+</template>
+

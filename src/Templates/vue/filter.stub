@@ -1,0 +1,91 @@
+<script lang="ts" setup>
+import { ref, watch } from 'vue';
+import { c } from '@dashboard/utilities/langHelper';
+
+// Page Filter Component
+interface Props {
+    modelValue: any;
+    pageOptions?: any;
+    loading?: boolean;
+    showAdvanced?: boolean;
+}
+
+interface Emits {
+    (e: 'update:modelValue', value: any): void;
+    (e: 'filter', value: any): void;
+    (e: 'reset'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    loading: false,
+    showAdvanced: false,
+});
+
+const emit = defineEmits<Emits>();
+
+const localFilters = ref({ ...props.modelValue });
+
+watch(() => props.modelValue, (newValue) => {
+    localFilters.value = { ...newValue };
+}, { deep: true });
+
+const handleFilter = () => {
+    emit('update:modelValue', { ...localFilters.value });
+    emit('filter', { ...localFilters.value });
+};
+
+const handleReset = () => {
+    localFilters.value = {
+        search: '',
+        // Reset other filters
+    };
+    emit('update:modelValue', { ...localFilters.value });
+    emit('reset');
+};
+</script>
+
+<template>
+    <div class="mb-4 p-4 bg-surface-50 dark:bg-surface-800 rounded-lg">
+        <div class="flex items-center gap-4 flex-wrap">
+            <!-- Search -->
+            <div class="flex-1 min-w-[200px]">
+                <span class="p-input-icon-left w-full relative">
+                    <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <InputText
+                        v-model="localFilters.search"
+                        :placeholder="c('common.search', 'common')"
+                        class="w-full pl-10"
+                        @keyup.enter="handleFilter"
+                    />
+                </span>
+            </div>
+
+            <!-- Filter Actions -->
+            <div class="flex items-center gap-2">
+                <AppButton
+                    size="small"
+                    :label="c('common.filter', 'common')"
+                    icon="pi pi-filter"
+                    @click="handleFilter"
+                    :loading="loading"
+                />
+                <AppButton
+                    size="small"
+                    :label="c('common.reset', 'common')"
+                    icon="pi pi-refresh"
+                    severity="secondary"
+                    outlined
+                    @click="handleReset"
+                />
+            </div>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div v-if="showAdvanced" class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Add advanced filter fields here -->
+            </div>
+        </div>
+    </div>
+</template>
+

@@ -1,0 +1,83 @@
+import { defineStore } from "pinia";
+import type { Application } from "@shared/types/responses";
+
+interface MenuItem {
+    name: string;
+    label?: string;
+    path: string;
+    icon: string;
+    children?: any[];
+    permissions: string[];
+}
+
+//ui app store
+// This store is used to manage the state of the application UI
+export const useUIStore = defineStore("app", {
+    state: () => ({
+        showSidebar: false,
+        message: "",
+        title: "",
+        loading: false,
+        application: null as Application | null,
+        mainMenu: [] as MenuItem[],
+        settings: {} as Record<string, any>,
+    }),
+    actions: {
+        setApplication(application: Application | null) {
+            // Create a new object to ensure reactivity
+            this.application = application ? { ...application } : null;
+        },
+        setMainMenu(mainMenu: any[]) {
+            this.mainMenu = mainMenu;
+        },
+        setSidebar(open: boolean) {
+            this.showSidebar = open;
+        },
+        setMessage(newMessage: string) {
+            this.message = newMessage;
+        },
+        setTitle(newTitle: string) {
+            if (newTitle) {
+                document.title = newTitle;
+                this.title = newTitle;
+            }
+        },
+        clearMessage() {
+            this.message = "";
+        },
+        setLoading(isLoading: boolean) {
+            this.loading = isLoading;
+        },
+        /**
+         * Set a setting value
+         */
+        setSetting(key: string, value: any) {
+            this.settings[key] = value;
+        },
+        /**
+         * Get a setting value
+         */
+        getSetting(key: string, defaultValue: any = null) {
+            return this.settings[key] ?? defaultValue;
+        },
+        /**
+         * Set multiple settings at once
+         */
+        setSettings(settings: Record<string, any>) {
+            this.settings = { ...this.settings, ...settings };
+        },
+        /**
+         * Clear all settings
+         */
+        clearSettings() {
+            this.settings = {};
+        },
+        /**
+         * Remove a specific setting
+         */
+        removeSetting(key: string) {
+            delete this.settings[key];
+        },
+    },
+});
+

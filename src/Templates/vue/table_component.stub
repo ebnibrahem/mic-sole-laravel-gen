@@ -1,0 +1,309 @@
+<script lang="ts" setup>
+import { c, lang } from '@dashboard/utilities/langHelper';
+import type { {{modelName}} } from '@shared/types/{{modelNameLower}}';
+import { useConfirm } from 'primevue/useconfirm';
+import { ref, computed, shallowRef, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@shared/stores/auth_store';
+
+interface Props {
+    {{modelNamePluralLower}}: {{modelName}}[];
+    loading: boolean;
+    pagination: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
+    showActions?: boolean;
+    filters: any;
+    sortOrder?: 'asc' | 'desc';
+}
+
+interface Emits {
+    (e: '{{modelNameLower}}-selected', {{modelNameLower}}: {{modelName}}): void;
+    (e: '{{modelNameLower}}-edit', {{modelNameLower}}: {{modelName}}): void;
+    (e: '{{modelNameLower}}-delete', {{modelNameLower}}: {{modelName}}): void;
+    (e: 'bulk-delete', ids: number[]): void;
+    (e: 'bulk-activate', ids: number[]): void;
+    (e: 'bulk-deactivate', ids: number[]): void;
+    (e: 'refresh'): void;
+    (e: 'page-change', page: number): void;
+    (e: 'page-size-change', pageSize: number): void;
+    (e: 'sort-change', sortBy: string, sortOrder: 'asc' | 'desc'): void;
+    (e: 'load-data', filters: any): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    showActions: true,
+});
+
+const emit = defineEmits<Emits>();
+
+const router = useRouter();
+const confirm = useConfirm();
+const authStore = useAuthStore();
+
+const tableRef = ref();
+// Use shallowRef for large lists to improve memory performance
+const selected{{modelNamePlural}} = shallowRef<{{modelName}}[]>([]);
+
+// Check if user has permissions
+const canView = computed(() => {
+    return authStore.hasPermission('{{modelNameLower}}_view');
+});
+
+const canEdit = computed(() => {
+    return authStore.hasPermission('{{modelNameLower}}_edit');
+});
+
+const canDelete = computed(() => {
+    return authStore.hasPermission('{{modelNameLower}}_delete');
+});
+
+const canCreate = computed(() => {
+    return authStore.hasPermission('{{modelNameLower}}_create');
+});
+
+// Check if model has active field (for bulk activate/deactivate)
+const hasActiveField = computed(() => {
+    // Check if any field in the model has 'is_active' or 'is_published' or similar
+    return props.{{modelNamePluralLower}}.some((item: {{modelName}}) =>
+        'is_active' in item || 'is_published' in item || 'status' in item
+    );
+});
+
+const handlePageChange = (event: any) => {
+    emit('page-change', event.page + 1);
+};
+
+const handleView = ({{modelNameLower}}: {{modelName}}) => {
+    emit('{{modelNameLower}}-selected', {{modelNameLower}});
+};
+
+const handleEdit = ({{modelNameLower}}: {{modelName}}) => {
+    emit('{{modelNameLower}}-edit', {{modelNameLower}});
+};
+
+const handleDelete = ({{modelNameLower}}: {{modelName}}) => {
+    confirm.require({
+        message: lang('common.messages.delete_confirmation', '{{modelNameLower}}.singular', 'common'),
+        header: c('common.delete_confirm', 'common'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        acceptLabel: c('common.delete', 'common'),
+        rejectLabel: c('common.cancel', 'common'),
+        accept: () => {
+            emit('{{modelNameLower}}-delete', {{modelNameLower}});
+        },
+    });
+};
+
+const handleMultipleDelete = () => {
+    if (selected{{modelNamePlural}}.value.length === 0) return;
+
+    const ids = selected{{modelNamePlural}}.value.map(item => item.id);
+
+    confirm.require({
+        message: c('common.delete_selected', 'common') + ' (' + selected{{modelNamePlural}}.value.length + ') ' + c('{{modelNameLower}}.plural', '{{modelNameLower}}') + '؟',
+        header: c('common.delete_confirm', 'common'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        acceptLabel: c('common.delete', 'common'),
+        rejectLabel: c('common.cancel', 'common'),
+        accept: () => {
+            emit('bulk-delete', ids);
+            selected{{modelNamePlural}}.value = [];
+        },
+    });
+};
+
+const handleBulkActivate = () => {
+    if (selected{{modelNamePlural}}.value.length === 0) return;
+    emit('bulk-activate', selected{{modelNamePlural}}.value.map(item => item.id));
+    selected{{modelNamePlural}}.value = [];
+};
+
+const handleBulkDeactivate = () => {
+    if (selected{{modelNamePlural}}.value.length === 0) return;
+    emit('bulk-deactivate', selected{{modelNamePlural}}.value.map(item => item.id));
+    selected{{modelNamePlural}}.value = [];
+};
+
+// Sorting
+const currentSortOrder = computed(() => props.sortOrder || 'desc');
+const currentSortBy = computed(() => props.filters?.sort_by || 'id');
+
+const handleSort = (field: string) => {
+    // If clicking on the same field, toggle order; otherwise, set to asc
+    let newOrder: 'asc' | 'desc' = 'asc';
+    if (currentSortBy.value === field) {
+        newOrder = currentSortOrder.value === 'asc' ? 'desc' : 'asc';
+    }
+    emit('sort-change', field, newOrder);
+};
+
+const handleRefresh = () => {
+    emit('refresh');
+    emit('load-data', props.filters);
+};
+
+// Watch for data changes and filter out deleted items from selection
+watch(() => props.{{modelNamePluralLower}}, () => {
+    // Remove deleted items from selection
+    selected{{modelNamePlural}}.value = selected{{modelNamePlural}}.value.filter(selectedItem =>
+        props.{{modelNamePluralLower}}.some(item => item.id === selectedItem.id)
+    );
+}, { deep: true });
+
+// Export functions are now handled by ExportAsExcel and ExportAsPdf components
+</script>
+
+<template>
+    <div class="rounded-lg bg-white shadow-md">
+        <!-- Header -->
+        <div class="border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold">{{ c('{{modelNameLower}}.list_title', '{{modelNameLower}}') }}</h3>
+                <div class="flex gap-2">
+                    <ExportAsPdf
+                        :options="{
+                            fileName: '{{modelNamePluralLower}}-report',
+                            fileHeader: c('{{modelNameLower}}.list_title', '{{modelNameLower}}'),
+                            dt: tableRef,
+                            rtl: true,
+                        }"
+                    />
+                    <ExportAsImage
+                        :options="{
+                            fileName: '{{modelNamePluralLower}}-report',
+                            dt: tableRef,
+                        }"
+                    />
+                    <ExportAsExcel
+                        :options="{
+                            fileName: '{{modelNamePluralLower}}-report',
+                            data: props.{{modelNamePluralLower}},
+                            headers: [
+{{exportHeaders}}
+                            ],
+                        }"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Controls -->
+        <div class="bg-white border-b border-gray-200 px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800">{{ c('{{modelNameLower}}.plural', '{{modelNameLower}}') }}</h3>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <AppButton
+                        icon="pi pi-refresh"
+                        severity="info"
+                        text
+                        size="small"
+                        @click="$emit('refresh')"
+                        :loading="props.loading"
+                        v-tooltip.top="c('common.refresh', 'common')"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <DataTable
+            ref="tableRef"
+            v-model:selection="selected{{modelNamePlural}}"
+            :value="props.{{modelNamePluralLower}}"
+            :loading="props.loading"
+            :paginator="true"
+            :rows="pagination.per_page"
+            :totalRecords="pagination.total"
+            :first="(pagination.current_page - 1) * pagination.per_page"
+            dataKey="id"
+            selectionMode="multiple"
+            class="p-datatable-sm"
+            :emptyMessage="c('{{modelNameLower}}.no_{{modelNamePluralLower}}', '{{modelNameLower}}')"
+            @page="handlePageChange"
+        >
+            <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
+
+{{tableColumns}}
+
+            <!-- Actions Column -->
+            <Column v-if="showActions" :header="c('common.actions', 'common')" :sortable="false" style="width: 120px">
+                <template #body="{ data }">
+                    <div class="flex items-center space-x-2">
+                        <AppButton
+                            icon="pi pi-eye"
+                            severity="info"
+                            size="small"
+                            outlined
+                            @click="handleView(data)"
+                            :permissions="['{{modelNameLower}}_view']"
+                            v-tooltip.top="c('common.view', 'common')"
+                        />
+                        <AppButton
+                            icon="pi pi-pencil"
+                            severity="warning"
+                            size="small"
+                            outlined
+                            @click="handleEdit(data)"
+                            :permissions="['{{modelNameLower}}_edit']"
+                            v-tooltip.top="c('common.edit', 'common')"
+                        />
+                        <AppButton
+                            icon="pi pi-trash"
+                            severity="danger"
+                            size="small"
+                            outlined
+                            @click="handleDelete(data)"
+                            :permissions="['{{modelNameLower}}_delete']"
+                            v-tooltip.top="c('common.delete', 'common')"
+                        />
+                    </div>
+                </template>
+            </Column>
+        </DataTable>
+
+        <!-- Bulk Actions Bar (at bottom of table) -->
+        <div v-if="selected{{modelNamePlural}}.length > 0" class="flex items-center justify-between border-t border-gray-200 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
+            <span class="text-sm font-medium text-gray-700">
+                تم تحديد {{ selected{{modelNamePlural}}.length }} {{ c('{{modelNameLower}}.plural', '{{modelNameLower}}') }}
+            </span>
+            <div class="flex items-center gap-2">
+                <AppButton
+                    icon="pi pi-trash"
+                    severity="danger"
+                    outlined
+                    size="small"
+                    :label="c('common.bulk_delete', 'common') + ' (' + selected{{modelNamePlural}}.length + ')'"
+                    :permissions="['{{modelNameLower}}_delete']"
+                    @click="handleMultipleDelete"
+                />
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="!props.loading && props.{{modelNamePluralLower}}.length === 0" class="p-12 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <i class="pi pi-file mb-6 text-6xl text-gray-300"></i>
+            <h3 class="mb-3 text-xl font-semibold text-gray-700">{{ c('{{modelNameLower}}.no_{{modelNamePluralLower}}', '{{modelNameLower}}') }}</h3>
+            <p class="mb-6 text-gray-500 max-w-md mx-auto">{{ c('{{modelNameLower}}.no_{{modelNamePluralLower}}_message', '{{modelNameLower}}') }}</p>
+            <AppButton
+                :label="c('{{modelNameLower}}.create_new', '{{modelNameLower}}')"
+                icon="pi pi-plus"
+                @click="router.push({ name: '{{modelNamePluralLower}}.create' })"
+                severity="success"
+                :permissions="['{{modelNameLower}}_create']"
+                size="large"
+            />
+        </div>
+    </div>
+</template>
+

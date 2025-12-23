@@ -1,0 +1,45 @@
+@props([
+'name',
+'label' => null,
+'checked' => false,
+'required' => false,
+'disabled' => false,
+'value' => '1'
+])
+
+@php
+$id = $name;
+$checked = $checked || old($name);
+$hasError = isset($errors) && $errors->has($name);
+@endphp
+
+<div class="flex items-center gap-2">
+    <input
+        id="{{ $id }}"
+        name="{{ $name }}"
+        type="checkbox"
+        value="{{ $value }}"
+        @if($checked) checked @endif
+        @if($required) required @endif
+        @if($disabled) disabled @endif
+        class="w-4 h-4 rounded border transition-colors cursor-pointer"
+        style="border-color: var(--border); accent-color: var(--primary);"
+        {{ $attributes }}
+    >
+
+    @if($label)
+    <label for="{{ $id }}" class="text-sm font-medium leading-none cursor-pointer" style="color: var(--foreground);">
+        {{ $label }}
+        @if($required)
+        <span class="text-red-500">*</span>
+        @endif
+    </label>
+    @endif
+</div>
+
+@if($hasError)
+<p class="text-sm text-red-600 dark:text-red-400 mt-1">
+    {{ isset($errors) ? $errors->first($name) : '' }}
+</p>
+@endif
+

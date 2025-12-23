@@ -1,0 +1,79 @@
+import { defineStore } from "pinia";
+import type { User, Permission, Role } from "@shared/types/responses";
+
+interface AuthState {
+    isAuthenticated: boolean;
+    user: User | null;
+    token: string | null;
+}
+
+export const useAuthStore = defineStore("auth", {
+    state: (): AuthState => ({
+        isAuthenticated: false,
+        user: null,
+        token: localStorage.getItem('auth_token'),
+    }),
+    actions: {
+        login(user: User, token?: string) {
+            this.isAuthenticated = true;
+            this.user = user;
+            if (token) {
+                this.token = token;
+                localStorage.setItem('auth_token', token);
+            }
+        },
+        setUser(user: User) {
+            this.user = user;
+            this.isAuthenticated = !!user;
+        },
+        setToken(token: string) {
+            this.token = token;
+            localStorage.setItem('auth_token', token);
+        },
+        getPermissions() {
+            const permissions = this.user?.roles?.flatMap((role: Role) => role?.permissions?.map((permission: Permission) => permission.name)) || [];
+            return Array.from(new Set(permissions));
+        },
+        getFullPermissions() {
+            const permissions =
+                this.user?.roles?.flatMap((role: Role) =>
+                    role.permissions?.map((permission: Permission) => permission)
+                ) || [];
+            return Array.from(new Set(permissions));
+        },
+        hasPermission(permissionName: string) {
+            if (!this.user) return false;
+            const permissions = this.user?.roles?.flatMap((role: Role) => role.permissions?.map((permission: Permission) => permission.name)) || [];
+            return permissions.includes(permissionName);
+        },
+        //check if the user has at least one of the permissions
+        hasPermissions(permissions: string[]) {
+            if (permissions.length === 0) return true;
+            if (!this.user || !Array.isArray(permissions)) return false;
+
+            const userPermissions = this.getPermissions();
+            return permissions.some((permission) =>
+                userPermissions.includes(permission)
+            );
+        },
+        //user has all the permissions
+        hasAllPermissions(permissions: string[]) {
+            if (!this.user || !Array.isArray(permissions)) return false;
+            const userPermissions = this.getPermissions();
+            return permissions.every((permission) =>
+                userPermissions.includes(permission)
+            );
+        },
+        logout() {
+            this.isAuthenticated = false;
+            this.user = null;
+            this.token = null;
+            localStorage.removeItem('auth_token');
+        },
+    },
+    getters: {
+        isLoggedIn: (state) => state.isAuthenticated,
+        getUser: (state) => state.user,
+    },
+});
+

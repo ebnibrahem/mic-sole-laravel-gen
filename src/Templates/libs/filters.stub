@@ -1,0 +1,32 @@
+/**
+ * Shared filters and helper functions
+ * Re-exports from langHelper for better organization
+ */
+
+// Re-export translation functions
+export { c, initTranslations } from '@dashboard/utilities/langHelper';
+
+/**
+ * Get storage URL
+ * @param path - Storage path
+ * @returns Full storage URL
+ */
+export function storage(path: string | null | undefined): string | undefined {
+    if (!path) return undefined;
+    // إذا كان المسار يبدأ بـ http أو https، أرجعه كما هو
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    // إذا كان المسار نسبي، أضف المسار الأساسي
+    return `/storage/${path}`;
+}
+
+/**
+ * Get avatar URL (alias for storage)
+ * @param path - Avatar path
+ * @returns Full avatar URL
+ */
+export function avatar(path: string | null | undefined): string | undefined {
+    return storage(path);
+}
+

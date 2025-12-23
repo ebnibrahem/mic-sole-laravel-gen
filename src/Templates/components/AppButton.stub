@@ -1,0 +1,195 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useAuthStore } from '@shared/stores/auth_store';
+import Button from 'primevue/button';
+
+defineOptions({
+    name: "AppButton",
+});
+
+// Props
+interface Props {
+    // الصلاحيات المطلوبة - يمكن أن تكون صلاحية واحدة أو مصفوفة
+    permissions?: string | string[];
+    // نوع التحقق من الصلاحيات: 'any' (أي صلاحية) أو 'all' (جميع الصلاحيات)
+    permissionMode?: 'any' | 'all';
+    // النص أو المحتوى
+    label?: string;
+    // الأيقونة
+    icon?: string;
+    // موضع الأيقونة
+    iconPos?: 'left' | 'right' | 'top' | 'bottom';
+    // نوع الزر من PrimeVue
+    variant?: 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'help' | 'danger' | 'contrast' | 'surface';
+    // حجم الزر
+    size?: 'small' | 'large';
+    // شكل الزر
+    shape?: 'rounded' | 'square';
+    // حالة الزر
+    severity?: 'secondary' | 'success' | 'info' | 'warning' | 'help' | 'danger' | 'contrast';
+    // هل الزر معطل
+    disabled?: boolean;
+    // هل الزر محمل
+    loading?: boolean;
+    // هل الزر رابط
+    link?: boolean;
+    // هل الزر نص فقط
+    text?: boolean;
+    // هل الزر خارجي
+    outlined?: boolean;
+    // هل الزر دائري
+    rounded?: boolean;
+    // الرابط (إذا كان link = true)
+    to?: string | object;
+    // الهدف (إذا كان link = true)
+    target?: string;
+    // الكلاسات الإضافية
+    class?: string;
+    // الأنماط الإضافية
+    style?: string;
+    // نوع الزر (button | submit | reset)
+    type?: 'button' | 'submit' | 'reset';
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    permissionMode: 'any',
+    variant: 'primary',
+    size: undefined,
+    shape: 'rounded',
+    severity: undefined,
+    disabled: false,
+    loading: false,
+    link: false,
+    text: false,
+    outlined: false,
+    target: '_self',
+    class: '',
+    style: '',
+    iconPos: 'left',
+    type: 'button',
+});
+
+// Emits
+const emit = defineEmits<{
+    click: [event: MouseEvent];
+}>();
+
+// Store
+const authStore = useAuthStore();
+
+// Computed
+const hasRequiredPermissions = computed(() => {
+    // إذا لم يتم تحديد صلاحيات، اعرض الزر دائماً
+    if (!props.permissions) return true;
+
+    // إذا كان المستخدم غير مسجل دخول، لا تعرض الزر
+    if (!authStore.user) return false;
+
+    // تحويل الصلاحية الواحدة إلى مصفوفة
+    const permissionsArray = Array.isArray(props.permissions)
+        ? props.permissions
+        : [props.permissions];
+
+    // التحقق من الصلاحيات حسب النوع المحدد
+    if (props.permissionMode === 'all') {
+        return authStore.hasAllPermissions(permissionsArray);
+    } else {
+        return authStore.hasPermissions(permissionsArray);
+    }
+});
+
+const buttonClasses = computed(() => {
+    const classes = [];
+
+    // إضافة الكلاسات الأساسية
+    if (props.class) classes.push(props.class);
+
+    return classes.join(' ');
+});
+
+// Methods
+const handleClick = (event: MouseEvent) => {
+    if (props.disabled || props.loading) return;
+    emit('click', event);
+};
+</script>
+
+<template>
+    <!-- عرض المكون فقط إذا كان لديه الصلاحيات المطلوبة -->
+    <div v-if="hasRequiredPermissions" class="inline-block">
+        <!-- زر PrimeVue -->
+        <Button
+            v-if="!link"
+            :label="label"
+            :icon="icon"
+            :iconPos="iconPos"
+            :variant="variant"
+            :size="size"
+            :shape="rounded ? 'rounded' : shape"
+            :severity="severity"
+            :disabled="disabled"
+            :loading="loading"
+            :text="text"
+            :outlined="outlined"
+            :class="buttonClasses"
+            :style="style"
+            :type="type"
+            @click="handleClick"
+        >
+            <slot></slot>
+        </Button>
+
+        <!-- رابط PrimeVue -->
+        <router-link
+            v-else-if="link && to"
+            :to="to"
+            :target="target"
+            :class="buttonClasses"
+            :style="style"
+            @click="handleClick"
+        >
+            <Button
+                :label="label"
+                :icon="icon"
+                :variant="variant"
+                :size="size"
+                :shape="rounded ? 'rounded' : shape"
+                :severity="severity"
+                :disabled="disabled"
+                :loading="loading"
+                :text="text"
+                :outlined="outlined"
+                class="w-full"
+            >
+                <slot></slot>
+            </Button>
+        </router-link>
+
+        <!-- رابط خارجي -->
+        <a
+            v-else-if="link && typeof to === 'string' && to.startsWith('http')"
+            :href="to"
+            :target="target"
+            :class="buttonClasses"
+            :style="style"
+            @click="handleClick"
+        >
+            <Button
+                :label="label"
+                :icon="icon"
+                :variant="variant"
+                :size="size"
+                :shape="rounded ? 'rounded' : shape"
+                :severity="severity"
+                :disabled="disabled"
+                :loading="loading"
+                :text="text"
+                :outlined="outlined"
+                class="w-full"
+            >
+                <slot></slot>
+            </Button>
+        </a>
+    </div>
+</template>
+

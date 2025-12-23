@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UserRequest extends FormRequest
+{
+    public function authorize() { return true; }
+    public function rules() {
+        $userId = $this->route('user') ?? $this->route('id');
+        $isUpdate = $userId !== null;
+
+        return [
+            'name' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:255'],
+            'email' => [$isUpdate ? 'sometimes' : 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
+            'username' => ['nullable', 'string', 'max:255', Rule::unique('users', 'username')->ignore($userId)],
+            'password' => [$isUpdate ? 'nullable' : 'required', 'string', 'min:8'],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'bio' => ['nullable', 'string'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:5120'], // max:5120 = 5MB
+            'is_active' => ['nullable', 'boolean'],
+        ];
+    }
+}

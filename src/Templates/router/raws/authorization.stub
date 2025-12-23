@@ -1,0 +1,86 @@
+import { RouteRecordRaw } from 'vue-router';
+
+import Authorization from '@dashboard/pages/Authorization.vue';
+import User from '@dashboard/pages/User.vue';
+import UserCreate from '@dashboard/pages/UserCreate.vue';
+import RoleCreate from '@dashboard/pages/RoleCreate.vue';
+
+const routes: RouteRecordRaw[] = [
+    {
+        path: '/authorization',
+        name: 'authorization',
+        component: Authorization,
+        meta: {
+            label: 'authorization',
+            requireAuth: true,
+            show_in_menu: true,
+            icon: 'pi pi-shield',
+            permissions: ['user_access', 'role_access', 'permission_access'],
+            order: 8,
+            children: [
+                {
+                    name: 'authorization.users',
+                    label: 'user.plural',
+                    path: '/authorization?tab=users',
+                },
+                {
+                    name: 'authorization.roles',
+                    label: 'role.plural',
+                    path: '/authorization?tab=roles',
+                },
+                {
+                    name: 'authorization.permissions',
+                    label: 'permission.plural',
+                    path: '/authorization?tab=permissions',
+                },
+            ],
+        },
+    },
+    {
+        path: '/users/do/create',
+        name: 'users.create',
+        component: UserCreate,
+        meta: {
+            label: 'users.create',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['user_create'],
+        },
+    },
+    {
+        path: '/users/:id',
+        name: 'users.show',
+        component: User,
+        meta: {
+            label: 'users.show',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['user_access'],
+        },
+    },
+    {
+        path: '/roles/do/create',
+        name: 'roles.create',
+        component: RoleCreate,
+        meta: {
+            label: 'roles.create',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['role_create'],
+        },
+    },
+    {
+        path: '/roles/:id/edit',
+        name: 'roles.edit',
+        component: RoleCreate,
+        meta: {
+            label: 'roles.edit',
+            requireAuth: true,
+            show_in_menu: false,
+            permissions: ['role_edit'],
+        },
+    },
+];
+
+export default routes;
+

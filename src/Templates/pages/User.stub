@@ -1,0 +1,242 @@
+<script setup lang="ts">
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { c } from '@shared/libs/filters';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import type { User, Role } from '@shared/types/responses';
+import PageHeader from '@dashboard/layouts/PageHeader.vue';
+import UserFormShow from './_authorization/users/form-show.vue';
+import UserForm from './_authorization/users/form.vue';
+import PasswordChangeForm from './_authorization/users/password-change-form.vue';
+
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+
+const userId = computed(() => route.params.id as string);
+const activeTab = ref<string>((route.query.tab as string) || 'view');
+
+const user = ref<User | null>(null);
+const roles = ref<{ id: number; title: string }[]>([]);
+const loading = ref(false);
+const rolesLoading = ref(false);
+
+const loadUser = async () => {
+    loading.value = true;
+    await apiCall<User>({
+        endpoint: `users/${userId.value}`,
+        method: 'get',
+        onSuccess: (data: User) => {
+            user.value = data;
+            // تحديث عنوان الصفحة ديناميكياً بعد تحميل بيانات المستخدم
+            document.title = `${c('user.show', 'user')} - ${data.name || `#${userId.value}`}`;
+        },
+        onError: (message: string) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || 'فشل في تحميل بيانات المستخدم',
+                life: 3000,
+            });
+            router.push({ name: 'authorization', query: { tab: 'users' } });
+        }
+    });
+    loading.value = false;
+};
+
+// تحميل قائمة الأدوار
+const loadRoles = async () => {
+    rolesLoading.value = true;
+    await apiCall<Role>({
+        endpoint: 'roles',
+        method: 'get',
+        params: {
+            per_page: 100
+        },
+        onSuccessPaginate: (data: Role[], meta: any, options?: any) => {
+            roles.value = (data || []).map((role: Role) => ({
+                id: role.id,
+                title: role.title
+            }));
+        },
+        onError: (message: string) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || 'فشل في تحميل قائمة الأدوار',
+                life: 3000,
+            });
+        }
+    });
+    rolesLoading.value = false;
+};
+
+const handleTabChange = (tab: string | number) => {
+    activeTab.value = String(tab);
+    router.replace({ query: { ...route.query, tab: String(tab) } });
+};
+
+const handleEdit = () => {
+    activeTab.value = 'edit';
+    router.replace({ query: { ...route.query, tab: 'edit' } });
+    // تحميل قائمة الأدوار إذا لم تكن محملة
+    if (roles.value.length === 0) {
+        loadRoles();
+    }
+};
+
+const handleSave = async (formData: FormData, callbacks?: { onSuccess: () => void; onError: () => void }) => {
+    if (!user.value) return;
+
+    // لا نستخدم loading هنا - النموذج يدير loading الخاص به
+    await apiCall<User>({
+        endpoint: `users/${user.value.id}`,
+        method: 'put',
+        payload: formData,
+        useFormData: true,
+        onSuccess: (data) => {
+            user.value = data;
+            toast.add({
+                severity: 'success',
+                summary: c('common.success', 'common'),
+                detail: c('user.messages.updated', 'user'),
+                life: 3000,
+            });
+            // لا نغير التبويب - نبقى في تبويب التعديل
+            // activeTab.value = 'view';
+            // router.replace({ query: { ...route.query, tab: 'view' } });
+
+            // استدعاء callback لإعادة تعيين loading في النموذج
+            callbacks?.onSuccess();
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || c('common.error_occurred', 'common'),
+                life: 3000,
+            });
+
+            // استدعاء callback لإعادة تعيين loading في النموذج
+            callbacks?.onError();
+        }
+    });
+};
+
+const handleCancel = () => {
+    activeTab.value = 'view';
+    router.replace({ query: { ...route.query, tab: 'view' } });
+};
+
+// تحميل قائمة الأدوار عند التبديل لتبويب التعديل
+watch(activeTab, (newTab) => {
+    if (newTab === 'edit' && roles.value.length === 0) {
+        loadRoles();
+    }
+}, { immediate: true });
+
+onMounted(() => {
+    loadUser();
+    // تحميل قائمة الأدوار إذا كان التبويب النشط هو التعديل
+    if (activeTab.value === 'edit') {
+        loadRoles();
+    }
+});
+</script>
+
+<template>
+    <div class="max-sm:p-0 p-4">
+        <!-- Page Header -->
+        <PageHeader
+            :title="c('user.show', 'user')"
+            :breadcrumb="[
+                { label: c('common.dashboard', 'common'), to: '/' },
+                { label: c('authorization.title', 'common'), to: '/authorization?tab=users' },
+                { label: user?.name || `#${userId}` },
+            ]"
+            icon="pi pi-user"
+        >
+            <template #actions>
+                <AppButton
+                    :label="c('common.back', 'common')"
+                    icon="pi pi-arrow-right"
+                    severity="secondary"
+                    @click="router.push({ name: 'authorization', query: { tab: 'users' } })"
+                />
+            </template>
+        </PageHeader>
+
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-12">
+            <i class="pi pi-spin pi-spinner text-4xl text-primary-500"></i>
+            <p class="text-gray-600 mt-4">{{ c('common.loading', 'common') }}</p>
+        </div>
+
+        <!-- User Content -->
+        <div v-else-if="user">
+            <Card class="shadow-md">
+                <template #content>
+                    <Tabs :value="activeTab" @update:value="handleTabChange">
+                        <TabList>
+                            <Tab value="view" class="flex items-center gap-2">
+                                <i class="pi pi-eye"></i>
+                                {{ c('common.view', 'common') }}
+                            </Tab>
+                            <Tab value="edit" class="flex items-center gap-2">
+                                <i class="pi pi-pencil"></i>
+                                {{ c('common.edit', 'common') }}
+                            </Tab>
+                            <Tab value="password" class="flex items-center gap-2">
+                                <i class="pi pi-key"></i>
+                                {{ c('common.change_password', 'common') }}
+                            </Tab>
+                        </TabList>
+                        <TabPanels>
+                            <TabPanel value="view">
+                                <div class="p-6">
+                                    <UserFormShow :user="user" @edit="handleEdit" />
+                                </div>
+                            </TabPanel>
+                                   <TabPanel value="edit">
+                                       <div class="p-6">
+                                           <UserForm
+                                               :user="user"
+                                               :isEdit="true"
+                                               :roleOptions="roles.map(r => ({ label: r.title, value: r.id }))"
+                                               :loading="false"
+                                               @submit="handleSave"
+                                               @cancel="handleCancel"
+                                               @go-to-list="() => router.push({ name: 'authorization', query: { tab: 'users' } })"
+                                           />
+                                       </div>
+                                   </TabPanel>
+                            <TabPanel value="password">
+                                <div class="p-6">
+                                    <PasswordChangeForm
+                                        :user="user"
+                                        @saved="loadUser"
+                                    />
+                                </div>
+                            </TabPanel>
+                        </TabPanels>
+                    </Tabs>
+                </template>
+            </Card>
+        </div>
+
+        <!-- Not Found State -->
+        <div v-else class="text-center py-12">
+            <i class="pi pi-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+            <p class="text-gray-600">{{ c('common.not_found', 'common') }}</p>
+            <AppButton
+                :label="c('common.back', 'common')"
+                icon="pi pi-arrow-right"
+                severity="secondary"
+                class="mt-4"
+                @click="router.push({ name: 'authorization', query: { tab: 'users' } })"
+            />
+        </div>
+    </div>
+</template>

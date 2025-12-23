@@ -1,0 +1,48 @@
+{
+    "name": "ebnibrahem/mic-sole-laravel-gen",
+    "description": "Laravel CRUD Generator Package with Vue/React Frontend Support",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "crud",
+        "generator",
+        "vue",
+        "react",
+        "dashboard",
+        "admin",
+        "scaffold"
+    ],
+    "authors": [
+        {
+            "name": "Mohamed Ibrahim (ابوالخليل | MIC)",
+            "email": "ebnibrahem@gmail.com",
+            "homepage": "https://github.com/ebnibrahem",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://github.com/ebnibrahem/mic-sole-laravel-gen",
+    "support": {
+        "issues": "https://github.com/ebnibrahem/mic-sole-laravel-gen/issues",
+        "source": "https://github.com/ebnibrahem/mic-sole-laravel-gen"
+    },
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "MicSoleLaravelGen\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MicSoleLaravelGen\\Providers\\MicSoleLaravelGenServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+

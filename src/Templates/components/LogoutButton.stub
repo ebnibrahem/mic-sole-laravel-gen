@@ -1,0 +1,31 @@
+<script setup lang="ts">
+import { useAuthStore } from '@shared/stores/auth_store';
+
+defineOptions({
+    name: 'LogoutButton',
+});
+
+const authStore = useAuthStore();
+
+const handleLogout = () => {
+    // Clear local auth state
+    authStore.logout();
+
+    // Redirect to logout route (GET) which will handle session cleanup and redirect to home
+    window.location.href = '/logout';
+};
+</script>
+
+<template>
+    <div @click="handleLogout">
+        <slot>
+            <button
+                class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="تسجيل الخروج"
+            >
+                <i class="pi pi-sign-out text-xl text-gray-700 dark:text-gray-300"></i>
+            </button>
+        </slot>
+    </div>
+</template>
+

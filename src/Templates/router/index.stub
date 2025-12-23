@@ -1,0 +1,112 @@
+import { createRouter, createWebHashHistory, NavigationGuardNext, RouteLocationNormalized } from 'vue-router';
+import routes from './routes';
+import { c } from '@dashboard/utilities/langHelper';
+import { useAuthStore } from '@shared/stores/auth_store';
+
+/**
+ * Get page title from route meta
+ * Priority: title > label (with smart translation) > route name
+ *
+ * @param route - Vue Router route object
+ * @returns Page title string or null
+ */
+export function getPageTitle(route: RouteLocationNormalized): string | null {
+    const meta = route.meta;
+
+    // Priority 1: Use title directly if provided
+    if (meta?.title) {
+        return String(meta.title);
+    }
+
+    // Priority 2: Use label with smart translation
+    if (meta?.label) {
+        const label = String(meta.label);
+
+        // Special case for authorization page (use title key)
+        if (label === 'authorization') {
+            return c('authorization.title', 'common') || 'الصلاحيات والأدوار';
+        }
+
+        // If label contains dot (like 'user.plural', 'setting.title', 'users.create'), translate it directly
+        if (label.includes('.')) {
+            const parts = label.split('.');
+            let dir = parts[0];
+            const key = parts.slice(1).join('.');
+
+            // Handle plural forms (users -> user, roles -> role, permissions -> permission)
+            // This is needed because route labels use plural (users.create) but translation files use singular (user.php)
+            const singularMap: Record<string, string> = {
+                'users': 'user',
+                'roles': 'role',
+                'permissions': 'permission',
+            };
+            if (singularMap[dir]) {
+                dir = singularMap[dir];
+            }
+
+            const translated = c(key, dir);
+            if (translated && translated !== key) return translated;
+        }
+
+        // Try common translation keys in order: title > plural > singular
+        const titleKeys = [
+            `${label}.title`,
+            `${label}.plural`,
+            label
+        ];
+        const translated = c(titleKeys, 'common');
+        if (translated) return translated;
+    }
+
+    // Priority 3: Use route name as fallback
+    if (route.name) {
+        return String(route.name);
+    }
+
+    return null;
+}
+
+const router = createRouter({
+    history: createWebHashHistory(),
+    routes,
+});
+
+// Navigation guard to set page title and handle authentication
+router.beforeEach((to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
+    try {
+        const authStore = useAuthStore();
+        const isAuthenticated = !!authStore?.user;
+        const requiresAuth = to.meta?.requireAuth !== false;
+
+        // Set initial page title using helper function
+        const pageTitle = getPageTitle(to);
+        if (pageTitle) {
+            document.title = pageTitle;
+        }
+
+        // Handle authentication
+        if (requiresAuth && !isAuthenticated) {
+            // Redirect to Laravel login page
+            const redirectPath = to.fullPath.startsWith('/') ? to.fullPath : '/' + to.fullPath;
+            window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`;
+            return;
+        } else if (!requiresAuth && isAuthenticated && (to.name === 'login' || to.name === 'register')) {
+            // Redirect to dashboard (root path) if already authenticated and trying to access login/register
+            next({ name: 'dashboard' });
+        } else {
+            next();
+        }
+    } catch (error) {
+        console.error('Router navigation error:', error);
+        next();
+    }
+});
+
+// After navigation, allow components to update title dynamically
+router.afterEach((to: RouteLocationNormalized) => {
+    // Components can update document.title directly if needed
+    // The initial title is set in beforeEach above
+});
+
+export default router;
+

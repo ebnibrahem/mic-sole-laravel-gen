@@ -1,0 +1,33 @@
+<?php
+
+// CRUD Generator Routes
+use MicSoleLaravelGen\Http\Controllers\CrudGeneratorController;
+
+// API Routes (must be before the catch-all route)
+// Web routes (with CSRF protection)
+Route::post('/generator', [CrudGeneratorController::class, 'generate']);
+Route::get('/generator/history', [CrudGeneratorController::class, 'getHistory']);
+Route::get('/generator/stats', [CrudGeneratorController::class, 'getStats']);
+Route::get('/generator/generation/{id}', [CrudGeneratorController::class, 'getGeneration']);
+Route::post('/generator/rollback', [CrudGeneratorController::class, 'rollback']);
+Route::post('/generator/rollback/preview', [CrudGeneratorController::class, 'previewRollback']);
+Route::get('/generator/models', [CrudGeneratorController::class, 'getModels']);
+Route::delete('/generator/history', [CrudGeneratorController::class, 'clearHistory']);
+
+// API routes (without CSRF protection - for testing/automation)
+Route::prefix('api/generator')->group(function () {
+    Route::post('/generate', [CrudGeneratorController::class, 'generate']);
+    Route::get('/history', [CrudGeneratorController::class, 'getHistory']);
+    Route::get('/stats', [CrudGeneratorController::class, 'getStats']);
+    Route::get('/generation/{id}', [CrudGeneratorController::class, 'getGeneration']);
+    Route::post('/rollback', [CrudGeneratorController::class, 'rollback']);
+    Route::post('/rollback/preview', [CrudGeneratorController::class, 'previewRollback']);
+    Route::get('/models', [CrudGeneratorController::class, 'getModels']);
+    Route::delete('/history', [CrudGeneratorController::class, 'clearHistory']);
+});
+
+// View route (must be last)
+Route::get('/generator', function () {
+    return view('generator');
+});
+

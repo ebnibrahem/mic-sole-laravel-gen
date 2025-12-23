@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
+
+@php
+    $logo = '/images/logo.png';
+    $favicon = '/images/logo.png';
+    try {
+        if (class_exists(\App\Models\Application::class)) {
+            $application = \App\Models\Application::first() ?? null;
+            if ($application && $application->logo) {
+                $logo = '/storage/' . $application->logo;
+                $favicon = '/storage/' . $application->logo;
+            }
+        }
+    } catch (\Exception $e) {
+        // Ignore errors and use default logo
+    }
+@endphp
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>{{ $title ?? config('app.name', 'Laravel') }}</title>
+
+    <link rel="icon" href="{{ $favicon }}" sizes="any">
+    <link rel="icon" href="{{ $favicon }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ $favicon }}">
+
+    {{-- Google Fonts - Arabic Fonts --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    @vite(['resources/css/app.css'])
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            {{-- Logo --}}
+            <div class="text-center">
+                <a href="/" class="block">
+                    <img
+                        class="mx-auto h-40 w-auto max-w-full object-contain rounded-lg shadow-sm"
+                        src="{{ $logo }}"
+                        alt="{{ config('app.name') }}"
+                        onerror="this.onerror=null; this.src='/images/logo.png';"
+                    >
+                </a>
+            </div>
+
+            {{-- Content --}}
+            <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                {{ $slot }}
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+

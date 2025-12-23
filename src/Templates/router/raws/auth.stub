@@ -1,0 +1,17 @@
+import { RouteRecordRaw } from 'vue-router';
+import Login from '@dashboard/pages/Login.vue';
+
+const routes: RouteRecordRaw[] = [
+    {
+        path: '/login',
+        name: 'login',
+        component: Login,
+        meta: {
+            requireAuth: false,
+            show_in_menu: false,
+        },
+    },
+];
+
+export default routes;
+

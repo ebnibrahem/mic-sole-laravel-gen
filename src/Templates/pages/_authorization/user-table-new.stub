@@ -1,0 +1,307 @@
+<script setup lang="ts">
+import { avatar, c } from '@shared/libs/filters';
+import type { User } from '@shared/types/responses';
+import { useConfirm } from 'primevue/useconfirm';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+interface Props {
+    data: User[];
+    loading: boolean;
+    pagination: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
+    showActions?: boolean;
+    filters?: any;
+    sortOrder?: any;
+    options?: any;
+}
+
+interface Emits {
+    (e: 'user-selected', user: User): void;
+    (e: 'user-edit', user: User): void;
+    (e: 'user-delete', user: User): void;
+    (e: 'bulk-delete', userIds: number[]): void;
+    (e: 'refresh'): void;
+    (e: 'page-change', page: number): void;
+    (e: 'page-size-change', pageSize: number): void;
+    (e: 'sort-change', order: any): void;
+    (e: 'load-data', filters?: any): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    loading: false,
+    showActions: true,
+    filters: () => ({}),
+    sortOrder: 'desc'
+});
+
+const emit = defineEmits<Emits>();
+
+const router = useRouter();
+const confirm = useConfirm();
+
+const selectedUsers = ref<User[]>([]);
+const tableRef = ref();
+const sortOrder = computed(() => props.sortOrder);
+
+// معالجة اختيار مستخدم
+const handleRowSelect = (event: any) => {
+    emit('user-selected', event.data as User);
+};
+
+// معالجة تعديل مستخدم
+const handleEdit = (user: User) => {
+    emit('user-edit', user);
+};
+
+// معالجة حذف مستخدم
+const handleDelete = (user: User) => {
+    confirm.require({
+        message: c('common.delete') + ' ' + user.name,
+        header: c('common.delete_confirm'),
+        icon: 'pi pi-exclamation-triangle',
+        rejectLabel: c('common.cancel'),
+        acceptLabel: c('common.delete'),
+        accept: () => {
+            emit('user-delete', user);
+        },
+    });
+};
+
+// معالجة الحذف المتعدد
+const handleBulkDelete = () => {
+    const userIds = selectedUsers.value.map((user) => user.id);
+    confirm.require({
+        message: c('common.delete') + ' ' + userIds.length + ' ' + c('user.plural'),
+        header: c('common.delete_confirm'),
+        icon: 'pi pi-exclamation-triangle',
+        rejectLabel: c('common.cancel'),
+        acceptLabel: c('common.delete'),
+        accept: () => {
+            emit('bulk-delete', userIds);
+        },
+    });
+};
+
+// معالجة تغيير الصفحة
+const handlePageChange = (event: any) => {
+    emit('page-change', event.page + 1);
+};
+
+// معالجة تغيير حجم الصفحة
+const handlePageSizeChange = (event: any) => {
+    emit('page-size-change', event.value);
+};
+
+// معالجة التحديث
+const handleRefresh = () => {
+    emit('load-data');
+};
+
+// Get clan label
+const getClanLabel = (clan?: 'user' | 'customer') => {
+    switch (clan) {
+        case 'user':
+            return c('user.clan.user');
+        case 'customer':
+            return c('user.clan.customer');
+        default:
+            return clan || '-';
+    }
+};
+
+// Get status label
+const getStatusLabel = (isActive: boolean) => {
+    return isActive ? c('common.active') : c('common.inactive');
+};
+
+// Get status severity
+const getStatusSeverity = (isActive: boolean) => {
+    return isActive ? 'success' : 'danger';
+};
+</script>
+
+<template>
+    <div class="rounded-lg bg-white shadow-md">
+        <!-- Header -->
+        <div class="border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold">{{ c('user.list_title') }}</h3>
+                <div class="flex gap-2">
+                    <ExportAsPdf
+                        :options="{
+                            fileName: 'users-report.pdf',
+                            fileHeader: c('user.list_title'),
+                            dt: tableRef,
+                            rtl: true,
+                        }"
+                    />
+                    <ExportAsExcel
+                        :options="{
+                            fileName: 'users-report',
+                            data: [],
+                            headers: [
+                                { key: 'id', label: 'ID', type: 'number' },
+                                { key: 'name', label: c('user.fields.name'), type: 'text' },
+                                { key: 'email', label: c('user.fields.email'), type: 'text' },
+                                { key: 'phone', label: c('user.fields.phone'), type: 'text' },
+                                { key: 'clan', label: c('user.fields.clan'), type: 'text' },
+                                { key: 'is_active', label: c('user.fields.is_active'), type: 'boolean' },
+                                { key: 'created_at', label: c('user.fields.created_at'), type: 'date' },
+                            ],
+                        }"
+                    />
+                    <AppButton
+                        v-if="selectedUsers.length > 0"
+                        icon="pi pi-trash"
+                        severity="danger"
+                        outlined
+                        size="small"
+                        :label="c('common.bulk_delete') + ' (' + selectedUsers.length + ')'"
+                        permissions="user_delete"
+                        @click="handleBulkDelete"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <DataTable
+            ref="tableRef"
+            v-model:selection="selectedUsers"
+            :value="data"
+            :loading="loading"
+            :paginator="true"
+            :rows="pagination.per_page"
+            :totalRecords="pagination.total"
+            :first="(pagination.current_page - 1) * pagination.per_page"
+            :sortField="'created_at'"
+            :sortOrder="sortOrder"
+            dataKey="id"
+            selectionMode="multiple"
+            class="p-datatable-sm"
+            :emptyMessage="c('user.no_users')"
+            @row-select="handleRowSelect"
+            @page="handlePageChange"
+        >
+            <!-- Image Column -->
+            <Column :header="c('user.fields.image', 'user')" :sortable="false" style="width: 80px">
+                <template #body="{ data }">
+                    <Avatar
+                        :image="data.image ? avatar(data.image) : undefined"
+                        :label="data.name?.charAt(0) || 'U'"
+                        size="normal"
+                        shape="circle"
+                        class="bg-primary text-white"
+                    />
+                </template>
+            </Column>
+
+            <!-- Name Column -->
+            <Column field="name" :header="c('user.fields.name')" :sortable="true">
+                <template #body="{ data }">
+                    <div class="flex items-center space-x-3">
+                        <div>
+                            <div class="font-medium text-gray-900">{{ data.name }}</div>
+                            <div class="text-sm text-gray-500">{{ data.email }}</div>
+                        </div>
+                    </div>
+                </template>
+            </Column>
+
+            <!-- Phone Column -->
+            <Column field="phone" :header="c('user.fields.phone')" :sortable="true">
+                <template #body="{ data }">
+                    <span class="text-gray-900">{{ data.phone || '-' }}</span>
+                </template>
+            </Column>
+
+            <!-- Clan Column -->
+            <Column field="clan" :header="c('user.fields.clan')" :sortable="true">
+                <template #body="{ data }">
+                    <Tag
+                        :value="getClanLabel(data.clan)"
+                        :severity="data.clan === 'user' ? 'info' : 'success'"
+                    />
+                </template>
+            </Column>
+
+            <!-- Status Column -->
+            <Column field="is_active" :header="c('user.fields.is_active')" :sortable="true">
+                <template #body="{ data }">
+                    <Tag
+                        :value="getStatusLabel(data.is_active)"
+                        :severity="getStatusSeverity(data.is_active)"
+                    />
+                </template>
+            </Column>
+
+            <!-- Created At Column -->
+            <Column field="created_at" :header="c('user.fields.created_at')" :sortable="true">
+                <template #body="{ data }">
+                    <span class="text-gray-900">{{ new Date(data.created_at).toLocaleDateString('ar-SA') }}</span>
+                </template>
+            </Column>
+
+            <!-- Actions Column -->
+            <Column v-if="showActions" :header="c('common.actions')" :sortable="false" style="width: 120px">
+                <template #body="{ data }">
+                    <div class="flex items-center space-x-2">
+                        <AppButton
+                            icon="pi pi-eye"
+                            severity="info"
+                            size="small"
+                            outlined
+                            @click="router.push(`/users/${data.id}`)"
+                            permissions="user_access"
+                        />
+                        <AppButton
+                            icon="pi pi-pencil"
+                            severity="warning"
+                            size="small"
+                            outlined
+                            @click="handleEdit(data)"
+                            permissions="user_edit"
+                        />
+                        <AppButton
+                            icon="pi pi-trash"
+                            severity="danger"
+                            size="small"
+                            outlined
+                            @click="handleDelete(data)"
+                            permissions="user_delete"
+                        />
+                    </div>
+                </template>
+            </Column>
+        </DataTable>
+
+        <!-- Empty State -->
+        <div v-if="!loading && data.length === 0" class="p-12 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <i class="pi pi-users mb-6 text-6xl text-gray-300"></i>
+            <h3 class="mb-3 text-xl font-semibold text-gray-700">{{ c('user.no_users') }}</h3>
+            <p class="mb-6 text-gray-500 max-w-md mx-auto">{{ c('user.no_users_message') }}</p>
+            <AppButton
+                :label="c('user.create_new')"
+                icon="pi pi-user-plus"
+                @click="router.push({ name: 'users.create' })"
+                severity="success"
+                permissions="user_create"
+                size="large"
+            />
+        </div>
+    </div>
+</template>
+
+<script lang="ts">
+export default {
+    name: 'UserTable'
+};
+</script>
+

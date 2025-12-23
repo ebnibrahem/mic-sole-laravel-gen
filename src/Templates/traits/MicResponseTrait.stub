@@ -1,0 +1,99 @@
+<?php
+
+namespace App\Traits;
+
+use Illuminate\Http\JsonResponse;
+
+trait MicResponseTrait
+{
+    /**
+     * Representation data as json
+     *
+     * @param  array  $data
+     * @param  string  $status
+     * @param  string  $message
+     * @param  int  $code
+     * @param  bool  $debug
+     * @return JsonResponse
+     */
+    public function apiResponse($data = [], $status = 'success', $message = '', $code = 200, $debug = false): JsonResponse
+    {
+        return \response()->json([
+            'status' => $status,
+            'message' => $message,
+            'data' => $data,
+            'request' => \request()->input(), // Use input() instead of all() to avoid file access issues
+            'endpoint' => \request()->fullUrl(),
+            'debug' => $debug, //to inject debug data
+        ], $code);
+    }
+
+    /**
+     * Representation error data as json
+     *
+     * @param  array  $data
+     * @param  string  $message
+     * @param  int  $code
+     * @return JsonResponse
+     */
+    public function apiResponseError($data = [], $message = '', $code = 200): JsonResponse
+    {
+        return $this->apiResponse(
+            data: $data,
+            status: 'error',
+            message: $message,
+            code: $code
+        );
+    }
+
+    /**
+     * Paginated response with data, meta, and options
+     *
+     * @param array|\Illuminate\Http\Resources\Json\ResourceCollection $data Array of items or ResourceCollection
+     * @param array $meta Pagination metadata (current_page, per_page, total, last_page, etc.)
+     * @param array $options Additional options (categories, filters, etc.)
+     * @param string $message Success message
+     * @param int $code HTTP status code
+     * @return JsonResponse
+     */
+    public function apiResponsePaginate(
+        $data = [],
+        array $meta = [],
+        array $options = [],
+        string $message = '',
+        int $code = 200
+    ): JsonResponse {
+        // Convert ResourceCollection to array if needed
+        if ($data instanceof \Illuminate\Http\Resources\Json\ResourceCollection) {
+            $data = $data->resolve();
+        }
+
+        return \response()->json([
+            'status' => 'success',
+            'message' => $message,
+            'data' => [
+                'data' => $data,
+                'meta' => $meta,
+                'options' => $options,
+            ],
+            'request' => \request()->input(), // Use input() instead of all() to avoid file access issues
+            'endpoint' => \request()->fullUrl()
+        ], $code);
+    }
+
+    /**
+     * Show SQL query with bindings (for debugging)
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string
+     */
+    public function showSQL($query): string
+    {
+        $querySql = $query->toSql();
+        $bindings = $query->getBindings();
+        $actualQuery = str_replace('?', "'{$bindings[0]}'", $querySql);
+
+        return $actualQuery;
+    }
+}
+

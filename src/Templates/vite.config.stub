@@ -1,0 +1,54 @@
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import vue from '@vitejs/plugin-vue';
+import { resolve } from 'path';
+import Components from 'unplugin-vue-components/vite';
+import { PrimeVueResolver } from '@primevue/auto-import-resolver';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                // 'resources/js/mic-sole.tsx',
+                // 'resources/css/mic-sole.css',
+                'resources/css/dashboard.css',
+                'resources/ts/dashboard.ts',
+            ],
+            refresh: true,
+        }),
+        tailwindcss(),
+        // react({
+        //     include: /\.(jsx|tsx)$/,
+        //     exclude: /node_modules|\.vue$/,
+        // }),
+        vue({
+            // include: /\.vue$/,
+            template: {
+                transformAssetUrls: {
+                    base: null,
+                    includeAbsolute: false,
+                },
+            },
+        }),
+        Components({
+            // include: /\.vue$/,
+            resolvers: [PrimeVueResolver()],
+        }),
+    ],
+    resolve: {
+        alias: {
+            '@dashboard': resolve(__dirname, 'resources/ts/_dashboard/'),
+            '@shared': resolve(__dirname, 'resources/ts/shared/'),
+            '@types': resolve(__dirname, 'resources/ts/shared/types/'),
+            '@libs': resolve(__dirname, 'resources/ts/shared/libs/'),
+            '@components': resolve(__dirname, 'resources/ts/shared/components/'),
+            '@js': resolve(__dirname, 'resources/js/'),
+            '@': resolve(__dirname, 'resources/js/'),
+        },
+    },
+});
+

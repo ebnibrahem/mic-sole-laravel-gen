@@ -1,0 +1,36 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\Role;
+
+class RoleSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Create System Admin role
+        Role::firstOrCreate(
+            ['title' => 'مدير النظام'],
+            [
+                'title' => 'مدير النظام',
+            ]
+        );
+
+        // Create Admin role
+        Role::firstOrCreate(
+            ['title' => 'مدير'],
+            [
+                'title' => 'مدير',
+            ]
+        );
+
+        // Create User role
+        Role::firstOrCreate(
+            ['title' => 'مستخدم'],
+            [
+                'title' => 'مستخدم',
+            ]
+        );
+    }
+}

@@ -1,0 +1,71 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Models\Application;
+use Closure;
+use Illuminate\Http\Request;
+
+class CheckApplicationStatus
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle(Request $request, Closure $next)
+    {
+        // Skip maintenance check for:
+        // 1. API routes
+        // 2. Login/logout routes
+        // 3. Dashboard routes (authenticated users should access dashboard even in maintenance)
+        // 4. Static assets
+        if (
+            $request->is('api/*') ||
+            $request->is('login') ||
+            $request->is('logout') ||
+            $request->is('dashboard') ||
+            $request->is('dashboard/*') ||
+            $request->is('storage/*') ||
+            $request->is('images/*') ||
+            $request->is('css/*') ||
+            $request->is('js/*') ||
+            $request->is('fonts/*') ||
+            $request->is('favicon.ico')
+        ) {
+            return $next($request);
+        }
+
+        // Skip maintenance check for authenticated users
+        // Authenticated users should be able to access the application even in maintenance mode
+        if (auth()->check()) {
+            return $next($request);
+        }
+
+        // Get application status
+        // In testing environment, skip if table doesn't exist
+        try {
+            $application = Application::first();
+        } catch (\Exception $e) {
+            // If table doesn't exist (e.g., in testing), allow request to proceed
+            if (app()->environment('testing')) {
+                return $next($request);
+            }
+            throw $e;
+        }
+
+        // If application doesn't exist or is_active is false, show maintenance page
+        // This only applies to non-authenticated users accessing non-dashboard routes
+        if (!$application || !$application->is_active) {
+            return response()->view('maintenance', [
+                'application' => $application,
+                'notes' => $application ? $application->notes : null,
+            ], 503);
+        }
+
+        return $next($request);
+    }
+}
+

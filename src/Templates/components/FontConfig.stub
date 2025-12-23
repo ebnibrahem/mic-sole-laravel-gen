@@ -1,0 +1,112 @@
+<template>
+    <div class="font-config">
+        <div class="font-selector">
+            <label class="font-label">{{ c('setting.fonts.select_font', 'setting') || 'اختر الخط:' }}</label>
+            <Select
+                v-model="selectedFont"
+                :options="availableFonts"
+                optionLabel="name"
+                optionValue="value"
+                :placeholder="c('setting.fonts.select_font', 'setting') || 'اختر الخط'"
+                class="w-full"
+                @change="changeFont"
+            >
+                <template #value="slotProps">
+                    <div v-if="slotProps.value" class="flex items-center gap-2">
+                        <span :style="{ fontFamily: getFontFamily(slotProps.value) }">
+                            {{ availableFonts.find(f => f.value === slotProps.value)?.name }}
+                        </span>
+                    </div>
+                    <span v-else>
+                        {{ slotProps.placeholder }}
+                    </span>
+                </template>
+                <template #option="slotProps">
+                    <div class="flex items-center gap-2" :style="{ fontFamily: slotProps.option.family }">
+                        <span>{{ slotProps.option.name }}</span>
+                        <span class="text-xs text-gray-500">- {{ slotProps.option.description }}</span>
+                    </div>
+                </template>
+            </Select>
+        </div>
+
+        <div class="font-preview">
+            <h4 class="preview-title">{{ c('setting.fonts.preview', 'setting') || 'معاينة الخط:' }}</h4>
+            <p class="preview-text" :style="{ fontFamily: getFontFamily(selectedFont) }">
+                {{ c('setting.fonts.preview_text', 'setting') || 'هذا نص تجريبي لمعاينة الخط المحدد. يمكنك رؤية كيف سيظهر الخط في التطبيق.' }}
+            </p>
+        </div>
+    </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useFontConfig } from '../composables/useFontConfig';
+import { c } from '@shared/libs/filters';
+
+defineOptions({
+    name: "FontConfig",
+});
+
+// Use font config composable
+const { availableFonts, currentFont, applyFont, getCurrentFont, getFontFamily } = useFontConfig();
+
+// Selected font
+const selectedFont = ref(getCurrentFont());
+
+// Change font function
+const changeFont = () => {
+    applyFont(selectedFont.value);
+};
+
+// Load saved font on mount
+onMounted(() => {
+    selectedFont.value = getCurrentFont();
+    // Apply font on mount
+    applyFont(selectedFont.value);
+});
+</script>
+
+<style scoped>
+.font-config {
+    padding: 1.5rem;
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+.font-selector {
+    margin-bottom: 1.5rem;
+}
+
+.font-label {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: var(--foreground);
+    font-size: 0.9375rem;
+}
+
+.font-preview {
+    padding: 1.5rem;
+    background: var(--muted);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.preview-title {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.preview-text {
+    margin: 0;
+    font-size: 1.125rem;
+    line-height: 1.8;
+    color: var(--foreground);
+    text-align: right;
+}
+</style>
+

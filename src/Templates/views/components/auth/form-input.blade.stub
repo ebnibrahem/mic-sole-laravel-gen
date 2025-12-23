@@ -1,0 +1,63 @@
+@props([
+'name',
+'type' => 'text',
+'label' => null,
+'placeholder' => null,
+'required' => false,
+'autocomplete' => null,
+'autofocus' => false,
+'disabled' => false,
+'readonly' => false,
+'value' => null,
+'tabindex' => null
+])
+
+@php
+$id = $name;
+$value = $value ?? old($name);
+$hasError = isset($errors) && $errors->has($name);
+@endphp
+
+<div class="space-y-2">
+    @if($label)
+    <label for="{{ $id }}" class="block text-sm font-medium leading-6 text-gray-900 dark:text-gray-100">
+        {{ $label }}
+        @if($required)
+        <span class="text-red-500">*</span>
+        @endif
+    </label>
+    @endif
+
+    <div class="relative">
+        <input
+            id="{{ $id }}"
+            name="{{ $name }}"
+            type="{{ $type }}"
+            @if($placeholder) placeholder="{{ $placeholder }}" @endif
+            @if($required) required @endif
+            @if($autocomplete) autocomplete="{{ $autocomplete }}" @endif
+            @if($autofocus) autofocus @endif
+            @if($disabled) disabled @endif
+            @if($readonly) readonly @endif
+            @if($value !== null) value="{{ $value }}" @endif
+            @if($tabindex) tabindex="{{ $tabindex }}" @endif
+            @class([
+                'block w-full px-4 rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset transition-colors',
+                'text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500',
+                'focus:ring-2 focus:ring-inset focus:ring-blue-500',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                'bg-white dark:bg-gray-700',
+                'border-red-500 ring-red-500' => $hasError,
+                'border-gray-300 dark:border-gray-600 ring-gray-300 dark:ring-gray-600' => !$hasError,
+            ])
+            {{ $attributes }}
+        >
+    </div>
+
+@if($hasError)
+<p class="text-sm text-red-600 dark:text-red-400">
+    {{ isset($errors) ? $errors->first($name) : '' }}
+</p>
+@endif
+</div>
+

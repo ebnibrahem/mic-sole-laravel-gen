@@ -1,0 +1,29 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\Application;
+
+class ApplicationSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Create or update application settings
+        // Use package information from mic-sole-laravel-gen
+        Application::firstOrCreate(
+            [],
+            [
+                'name' => config('app.name', 'Mic Sole Laravel'),
+                'alias' => 'MIC-SOLE',
+                'notes' => 'تطبيق مبني باستخدام حزمة Mic Sole Laravel CRUD Generator',
+                'description' => 'Laravel CRUD Generator Package with Vue/React Frontend Support - تطبيق إدارة مبني على Laravel 12 مع Vue 3 Dashboard',
+                'email' => 'ebnibrahem@gmail.com',
+                'phone' => '249915102431',
+                'address' => 'صنع في السودان',
+                'is_active' => true,
+            ]
+        );
+    }
+}
+

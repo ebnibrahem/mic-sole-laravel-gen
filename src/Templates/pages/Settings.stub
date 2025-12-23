@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import { c } from '@shared/libs/filters';
+import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import ApplicationTab from './_settings/ApplicationTab.vue';
+import { FontConfig, ColorConfig } from '@shared/components';
+
+const route = useRoute();
+const router = useRouter();
+const activeTab = ref<string>('application');
+
+// Read tab from query parameters
+onMounted(() => {
+    const tabParam = route.query.tab as string;
+    if (tabParam && ['application', 'fonts', 'colors'].includes(tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
+
+// Watch for tab changes and update URL
+watch(activeTab, (newTab) => {
+    router.replace({
+        query: { ...route.query, tab: newTab }
+    });
+});
+
+// Watch for URL query changes
+watch(() => route.query.tab, (newTab) => {
+    if (newTab && typeof newTab === 'string' && ['application', 'fonts', 'colors'].includes(newTab)) {
+        activeTab.value = newTab;
+    }
+});
+</script>
+
+<template>
+    <div class="max-sm:p-0 p-4">
+        <PageHeader
+            :title="c('setting.title', 'setting') || 'الإعدادات'"
+            :description="c('setting.description', 'setting') || 'إدارة إعدادات التطبيق'"
+            icon="pi pi-cog"
+        />
+
+        <Card class="shadow-md mt-4">
+            <template #content>
+                <Tabs :value="activeTab" @update:value="(val) => activeTab = String(val)">
+                    <TabList>
+                        <Tab value="application" class="flex items-center gap-2">
+                            <i class="pi pi-info-circle"></i>
+                            {{ c('setting.application_tab', 'setting') || 'معلومات التطبيق' }}
+                        </Tab>
+                        <Tab value="fonts" class="flex items-center gap-2">
+                            <i class="pi pi-font"></i>
+                            {{ c('setting.fonts.title', 'setting') || 'الخطوط' }}
+                        </Tab>
+                        <Tab value="colors" class="flex items-center gap-2">
+                            <i class="pi pi-palette"></i>
+                            {{ c('setting.colors.title', 'setting') || 'الألوان' }}
+                        </Tab>
+                    </TabList>
+                    <TabPanels>
+                        <TabPanel value="application">
+                            <ApplicationTab />
+                        </TabPanel>
+                        <TabPanel value="fonts">
+                            <div class="p-6">
+                                <FontConfig />
+                            </div>
+                        </TabPanel>
+                        <TabPanel value="colors">
+                            <div class="p-6">
+                                <ColorConfig />
+                            </div>
+                        </TabPanel>
+                    </TabPanels>
+                </Tabs>
+            </template>
+        </Card>
+    </div>
+</template>

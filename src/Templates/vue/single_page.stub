@@ -1,0 +1,288 @@
+<script lang="ts" setup>
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
+import { c, lang } from '@dashboard/utilities/langHelper';
+import { useApiHandler, createPrimeVueToastHandler } from '@dashboard/services/apiHandler';
+import type { {{modelName}} } from '@shared/types/{{modelNameLower}}';
+import {{modelName}}Form from './_{{modelNamePluralKebab}}/form.vue';
+import DateFormat from '@shared/components/utilities/DateFormat.vue';
+
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+const confirm = useConfirm();
+const { apiCall } = useApiHandler('dashboard');
+const toastHandler = createPrimeVueToastHandler(toast);
+
+const {{modelNameLower}} = ref<{{modelName}} | null>(null);
+const loading = ref(false);
+const activeTabIndex = ref(0); // 0: overview, 1: edit, 2: actions
+
+const load{{modelName}} = async () => {
+    loading.value = true;
+    const id = route.params.id;
+
+    await apiCall({
+        endpoint: `{{modelNamePluralLower}}/${id}`,
+        method: 'get',
+        onSuccess: (data: {{modelName}}) => {
+            {{modelNameLower}}.value = data;
+        },
+        onError: (message) => {
+            toast.add({
+                severity: 'error',
+                summary: c('common.error', 'common'),
+                detail: message || lang('common.messages.not_found', '{{modelNameLower}}.singular', 'common'),
+                life: 3000,
+            });
+            router.push({ name: '{{modelNamePluralLower}}.index' });
+        },
+    });
+
+    loading.value = false;
+};
+
+// Handle go to list
+const handleGoToList = () => {
+    router.push({ name: '{{modelNamePluralLower}}.index' });
+};
+
+// Handle form submission for edit
+const handleSubmit = async (formData: FormData, callbacks?: { onSuccess: (data?: {{modelName}}) => void; onError: () => void }) => {
+    if (!{{modelNameLower}}.value?.id) {
+        return;
+    }
+
+    // Prevent double submission
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
+    try {
+        const result = await apiCall<{{modelName}}>({
+            endpoint: `{{modelNamePluralLower}}/${ {{modelNameLower}}.value.id }`,
+            method: 'put',
+            payload: formData,
+            useFormData: true,
+            onSuccess: (data, message) => {
+                {{modelNameLower}}.value = data;
+                activeTabIndex.value = 0; // Switch to overview tab
+                toast.add({
+                    severity: 'success',
+                    summary: c('common.success', 'common'),
+                    detail: message || lang('common.messages.updated', '{{modelNameLower}}.singular', 'common'),
+                    life: 3000,
+                });
+                if (callbacks?.onSuccess) {
+                    // Pass updated data to callback
+                    callbacks.onSuccess(data);
+                }
+            },
+            onError: (message, code, validationErrors) => {
+                toast.add({
+                    severity: 'error',
+                    summary: c('common.error', 'common'),
+                    detail: message || lang('common.messages.not_found', '{{modelNameLower}}.singular', 'common'),
+                    life: 3000,
+                });
+                if (callbacks?.onError) {
+                    callbacks.onError();
+                }
+            }
+        });
+
+        // Ensure callbacks are called even if onSuccess/onError are not triggered
+        if (result.success && callbacks?.onSuccess) {
+            callbacks.onSuccess();
+        } else if (!result.success && callbacks?.onError) {
+            callbacks.onError();
+        }
+    } catch (error) {
+        if (callbacks?.onError) {
+            callbacks.onError();
+        }
+    } finally {
+        loading.value = false;
+    }
+};
+
+const handleDelete = () => {
+    confirm.require({
+        message: lang('common.messages.delete_confirmation', '{{modelNameLower}}.singular', 'common'),
+        header: c('common.delete_confirm', 'common'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        acceptLabel: c('common.delete', 'common'),
+        rejectLabel: c('common.cancel', 'common'),
+        accept: async () => {
+            await apiCall({
+                endpoint: `{{modelNamePluralLower}}/${ {{modelNameLower}}.value?.id }`,
+                method: 'delete',
+                onSuccess: (data, message) => {
+                    toast.add({
+                        severity: 'success',
+                        summary: c('common.deleted', 'common'),
+                        detail: message || lang('common.messages.deleted', '{{modelNameLower}}.singular', 'common'),
+                        life: 3000,
+                    });
+                    router.push({ name: '{{modelNamePluralLower}}.index' });
+                },
+                onError: (message) => {
+                    toast.add({
+                        severity: 'error',
+                        summary: c('common.error', 'common'),
+                        detail: message || lang('common.messages.not_found', '{{modelNameLower}}.singular', 'common'),
+                        life: 3000,
+                    });
+                },
+            });
+        },
+    });
+};
+
+onMounted(() => {
+    // Set active tab from query if provided
+    const tab = route.query.tab;
+    if (tab === 'edit') {
+        activeTabIndex.value = 1;
+    } else if (tab === 'actions') {
+        activeTabIndex.value = 2;
+    }
+    load{{modelName}}();
+});
+</script>
+
+<template>
+    <div class="p-4">
+        <!-- Page Header with Quick Actions -->
+        <PageHeader
+            :title="`${c('{{modelNameLower}}.singular', '{{modelNameLower}}')} #${ {{modelNameLower}}?.id || '' }`"
+            :description="c('{{modelNameLower}}.detail', '{{modelNameLower}}')"
+            icon="pi pi-info-circle"
+            :breadcrumb="[
+                { label: c('common.home', 'common'), to: '/dashboard', icon: 'pi pi-home' },
+                { label: c('{{modelNameLower}}.plural', '{{modelNameLower}}'), to: { name: '{{modelNamePluralLower}}.index' } },
+                { label: `${c('{{modelNameLower}}.singular', '{{modelNameLower}}')} #${ {{modelNameLower}}?.id || '' }` }
+            ]"
+        >
+            <template #actions>
+                <AppButton
+                    size="small"
+                    :label="c('common.view_list', 'common')"
+                    icon="pi pi-list"
+                    severity="secondary"
+                    outlined
+                    :permissions="['{{modelNameLower}}_view']"
+                    @click="router.push({ name: '{{modelNamePluralLower}}.index' })"
+                />
+                <AppButton
+                    size="small"
+                    :label="c('{{modelNameLower}}.edit', '{{modelNameLower}}')"
+                    icon="pi pi-pencil"
+                    severity="warning"
+                    :permissions="['{{modelNameLower}}_edit']"
+                    @click="activeTabIndex = 1"
+                />
+                <AppButton
+                    size="small"
+                    :label="c('common.delete', 'common')"
+                    icon="pi pi-trash"
+                    severity="danger"
+                    :permissions="['{{modelNameLower}}_delete']"
+                    @click="handleDelete"
+                />
+            </template>
+        </PageHeader>
+
+        <!-- Tabs -->
+        <div v-if="!loading && {{modelNameLower}}" class="mt-6">
+            <TabView v-model:activeIndex="activeTabIndex" class="mt-4">
+                <TabPanel value="overview">
+                    <template #header>
+                        <span class="flex items-center gap-2">
+                            <i class="pi pi-info-circle"></i>
+                            <span>{{ c('common.overview', 'common') }}</span>
+                        </span>
+                    </template>
+
+                    <!-- Overview Content -->
+                    <div class="space-y-6">
+                        <!-- Basic Information -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-800">{{ c('{{modelNameLower}}.basic_info', '{{modelNameLower}}') }}</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+{{fieldsDisplay}}
+                            </div>
+                        </div>
+
+                        <!-- Timestamps -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-800">{{ c('{{modelNameLower}}.timestamps', '{{modelNameLower}}') }}</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-1">
+                                    <div class="text-sm text-gray-500">{{ c('{{modelNameLower}}.fields.created_at', '{{modelNameLower}}') }}</div>
+                                    <DateFormat :date="{{modelNameLower}}?.created_at" />
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="text-sm text-gray-500">{{ c('{{modelNameLower}}.fields.updated_at', '{{modelNameLower}}') }}</div>
+                                    <DateFormat :date="{{modelNameLower}}?.updated_at" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </TabPanel>
+
+                <TabPanel value="edit">
+                    <template #header>
+                        <span class="flex items-center gap-2">
+                            <i class="pi pi-pencil"></i>
+                            <span>{{ c('{{modelNameLower}}.edit', '{{modelNameLower}}') }}</span>
+                        </span>
+                    </template>
+
+                    <!-- Edit Form -->
+                    <Card class="shadow-md">
+                        <template #content>
+                            <{{modelName}}Form
+                                :{{modelNameLower}}="{{modelNameLower}}"
+                                :is-edit="true"
+                                :loading="loading"
+                                @submit="handleSubmit"
+                                @cancel="() => activeTabIndex = 0"
+                                @go-to-list="handleGoToList"
+                            />
+                        </template>
+                    </Card>
+                </TabPanel>
+
+                <TabPanel value="actions">
+                    <template #header>
+                        <span class="flex items-center gap-2">
+                            <i class="pi pi-cog"></i>
+                            <span>{{ c('common.actions', 'common') }}</span>
+                        </span>
+                    </template>
+
+                    <!-- Actions Content -->
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-800">{{ c('common.additional_actions', 'common') }}</h3>
+                            <div class="space-y-2">
+                                <!-- Add custom actions here -->
+                            </div>
+                        </div>
+                    </div>
+                </TabPanel>
+            </TabView>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading" class="flex items-center justify-center py-12">
+            <i class="pi pi-spin pi-spinner text-4xl text-primary-500"></i>
+        </div>
+    </div>
+</template>
+

@@ -1,0 +1,54 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+
+// Authentication API routes (public - no auth required)
+Route::group(['prefix' => 'auth'], function () {
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [\App\Http\Controllers\Auth\PasswordResetLinkController::class, 'store']);
+    Route::post('/reset-password', [\App\Http\Controllers\Auth\NewPasswordController::class, 'store']);
+    // Register is handled through admin panel (users management) - no public registration
+});
+
+// Authentication API routes (protected - requires auth)
+Route::group(['prefix' => 'auth', 'middleware' => 'auth:sanctum'], function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
+});
+
+// API Routes (Protected with Sanctum Authentication)
+// Application API routes here
+Route::group(
+    [
+        'prefix' => 'v1',
+        'middleware' => 'auth:sanctum'
+    ],
+    function () {
+        // Admin Routes (Management System)
+        Route::group(
+            [
+                'middleware' => 'auth:sanctum'
+            ],
+            function () {Route::group([], __DIR__ . '/api/dashboard/api-categories.php');Route::group([], __DIR__ . '/api/dashboard/api-permissions.php');
+
+                Route::group([], __DIR__ . '/api/dashboard/api-roles.php');
+
+                Route::group([], __DIR__ . '/api/dashboard/api-users.php');
+                // Authorization management routes
+                Route::group([], __DIR__ . '/api/dashboard/api-authorization.php');
+
+                // Settings routes
+                Route::group([], __DIR__ . '/api/dashboard/api-settings.php');
+
+                // Editor routes (for rich text editor)
+                Route::group([], __DIR__ . '/api/dashboard/api-editor.php');
+
+                // Dashboard routes
+                Route::get('/dashboard/statistics', [\App\Http\Controllers\DashboardController::class, 'statistics']);
+
+                // Add more dashboard routes here
+            }
+        );
+    }
+);

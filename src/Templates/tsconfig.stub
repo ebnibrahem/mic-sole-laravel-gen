@@ -1,0 +1,59 @@
+{
+    "compilerOptions": {
+        /* Language and Environment */
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "jsx": "preserve",
+        "jsxImportSource": "vue",
+        "allowSyntheticDefaultImports": true,
+
+        /* Modules */
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "baseUrl": ".",
+        "paths": {
+            "@dashboard/*": ["./resources/ts/_dashboard/*"],
+            "@shared/*": ["./resources/ts/shared/components/*"],
+            "@types/*": ["./resources/ts/shared/types/*"],
+            "@libs/*": ["./resources/ts/shared/libs/*"],
+            "@components/*": ["./resources/ts/shared/components/*"],
+            "@/*": ["./resources/ts/*"]
+        },
+        "types": ["vite/client"],
+        "resolveJsonModule": true,
+
+        /* JavaScript Support */
+        "allowJs": true,
+
+        /* Emit */
+        "sourceMap": true,
+        "noEmit": true,
+
+        /* Interop Constraints */
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+
+        /* Type Checking */
+        "strict": true,
+
+        /* Completeness */
+        "skipLibCheck": true
+    },
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.d.ts",
+        "resources/js/**/*.tsx",
+        "resources/js/**/*.vue",
+        "resources/ts/**/*.ts",
+        "resources/ts/**/*.d.ts",
+        "resources/ts/**/*.vue",
+        "*.d.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "vendor"
+    ]
+}
+

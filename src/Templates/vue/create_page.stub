@@ -1,0 +1,107 @@
+<script lang="ts" setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { c } from '@shared/libs/filters';
+import { useApiHandler, createPrimeVueToastHandler } from '@dashboard/services/apiHandler';
+import type { {{modelName}} } from '@shared/types/{{modelNameLower}}';
+import {{modelName}}Form from './_{{modelNamePluralKebab}}/form.vue';
+
+const router = useRouter();
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+const toastHandler = createPrimeVueToastHandler(toast);
+
+const loading = ref(false);
+
+// Handle form submission
+const handleSubmit = async (formData: FormData, callbacks?: { onSuccess: () => void; onError: () => void }) => {
+    // Prevent double submission
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
+    try {
+        const result = await apiCall<{{modelName}}>({
+            endpoint: '{{modelNamePluralLower}}',
+            method: 'post',
+            payload: formData,
+            useFormData: true,
+            onSuccess: (data, message) => {
+                toastHandler.success(message || c('{{modelNameLower}}.messages.created', '{{modelNameLower}}'));
+                if (callbacks?.onSuccess) {
+                    callbacks.onSuccess();
+                }
+            },
+            onError: (message, code, validationErrors) => {
+                toastHandler.error(message);
+                if (callbacks?.onError) {
+                    callbacks.onError();
+                }
+            }
+        });
+
+        // Ensure callbacks are called even if onSuccess/onError are not triggered
+        if (result.success && callbacks?.onSuccess) {
+            callbacks.onSuccess();
+        } else if (!result.success && callbacks?.onError) {
+            callbacks.onError();
+        }
+    } catch (error) {
+        if (callbacks?.onError) {
+            callbacks.onError();
+        }
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Handle form cancellation
+const handleCancel = () => {
+    router.push({ name: '{{modelNamePluralLower}}.index' });
+};
+
+// Handle go to list
+const handleGoToList = () => {
+    router.push({ name: '{{modelNamePluralLower}}.index' });
+};
+</script>
+
+<template>
+    <div>
+        <PageHeader
+            :title="c('{{modelNameLower}}.create', '{{modelNameLower}}')"
+            :description="c('{{modelNameLower}}.create_description', '{{modelNameLower}}')"
+            icon="pi pi-plus"
+            :breadcrumb="[
+                { label: c('common.home', 'common'), to: '/dashboard', icon: 'pi pi-home' },
+                { label: c('{{modelNameLower}}.plural', '{{modelNameLower}}'), to: { name: '{{modelNamePluralLower}}.index' } },
+                { label: c('{{modelNameLower}}.create', '{{modelNameLower}}') }
+            ]"
+        >
+            <template #actions>
+                <AppButton
+                    :label="c('common.back', 'common')"
+                    icon="pi pi-arrow-right"
+                    severity="secondary"
+                    outlined
+                    @click="handleCancel"
+                />
+            </template>
+        </PageHeader>
+
+        <Card class="shadow-md">
+            <template #content>
+                <{{modelName}}Form
+                    :loading="loading"
+                    :is-edit="false"
+                    @submit="handleSubmit"
+                    @cancel="handleCancel"
+                    @go-to-list="handleGoToList"
+                />
+            </template>
+        </Card>
+    </div>
+</template>
+

@@ -1,0 +1,8 @@
+import { ComponentCustomProperties } from 'vue';
+
+declare module '@vue/runtime-core' {
+    interface ComponentCustomProperties {
+        $c: (key: string | string[], dir?: string, options?: { separator?: string; log?: boolean }) => string;
+    }
+}
+

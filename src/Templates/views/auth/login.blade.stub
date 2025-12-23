@@ -1,0 +1,178 @@
+<x-layouts.auth :title="__('auth.login_title', [], 'ar') ?? 'تسجيل الدخول'" :subtitle="__('auth.login_subtitle', [], 'ar') ?? 'أدخل بياناتك للدخول إلى لوحة التحكم'">
+    @if(session('status'))
+    <x-auth.alert type="success" class="mb-6">
+        {{ session('status') }}
+    </x-auth.alert>
+    @endif
+
+    <form method="POST" action="{{ route('login') }}" class="space-y-6">
+        @csrf
+
+        {{-- hidden redirect --}}
+        <input type="hidden" id="redirect" name="redirect" value="{{ request()->get('redirect', '/dashboard') }}">
+
+        <div class="space-y-5">
+            <div class="space-y-2">
+                <label for="login" class="block text-sm font-semibold" style="color: var(--foreground);">
+                    {{ __('auth.email_or_username_or_phone', [], 'ar') ?? 'البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف' }}
+                    <span class="text-red-500">*</span>
+                </label>
+                <input
+                    id="login"
+                    name="login"
+                    type="text"
+                    required
+                    autocomplete="username"
+                    autofocus
+                    tabindex="1"
+                    placeholder="{{ __('auth.email_or_username_or_phone_placeholder', [], 'ar') ?? 'أدخل البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف' }}"
+                    class="w-full px-4 py-3 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0"
+                    style="background: var(--background); border-color: var(--border); color: var(--foreground);"
+                    onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)';"
+                    onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                >
+                @error('login')
+                <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="space-y-2">
+                <label for="password" class="block text-sm font-semibold" style="color: var(--foreground);">
+                    {{ __('auth.password', [], 'ar') ?? 'كلمة المرور' }}
+                    <span class="text-red-500">*</span>
+                </label>
+
+                <div class="relative">
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        required
+                        tabindex="2"
+                        autocomplete="current-password"
+                        placeholder="{{ __('auth.password_placeholder', [], 'ar') ?? 'أدخل كلمة المرور' }}"
+                        class="w-full px-4 py-3 pr-12 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0"
+                        style="background: var(--background); border-color: var(--border); color: var(--foreground);"
+                        onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+
+                    <button
+                        type="button"
+                        onclick="togglePassword()"
+                        class="absolute inset-y-0 left-0 pl-3 flex items-center transition-colors"
+                        style="color: var(--muted-foreground);"
+                        onmouseover="this.style.color='var(--foreground)';"
+                        onmouseout="this.style.color='var(--muted-foreground)';"
+                        tabindex="3"
+                    >
+                        <svg id="eye-icon" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        <svg id="eye-off-icon" class="h-5 w-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                @if($errors->has('password'))
+                <p class="text-sm text-red-600 dark:text-red-400 mt-1">
+                    {{ $errors->first('password') }}
+                </p>
+                @endif
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <x-auth.form-checkbox
+                name="remember"
+                :label="__('auth.remember_me', [], 'ar') ?? 'تذكرني'"
+                :checked="old('remember')"
+            />
+            <a href="{{ route('password.request') }}" class="text-sm font-medium text-primary hover:text-primary-dark transition-colors">
+                {{ __('auth.forgot_password', [], 'ar') ?? 'نسيت كلمة المرور؟' }}
+            </a>
+        </div>
+
+        <button
+            type="submit"
+            class="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-lg shadow-md text-sm font-semibold text-primary-foreground bg-gradient-to-r from-primary-500 to-primary-700 hover:from-primary-600 hover:to-primary-800 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            tabindex="4"
+            id="login-button"
+        >
+            <span id="login-text">{{ __('auth.login_button', [], 'ar') ?? 'تسجيل الدخول' }}</span>
+            <span id="login-loading" class="hidden items-center gap-x-2">
+                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                جاري التحميل...
+            </span>
+        </button>
+
+        {{-- Test credentials button --}}
+        <button
+            type="button"
+            onclick="fillTestCredentials()"
+            class="w-full flex justify-center py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2"
+            style="background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border);"
+            tabindex="5"
+        >
+            تعبئة تلقائية
+        </button>
+    </form>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            const eyeOffIcon = document.getElementById('eye-off-icon');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.classList.add('hidden');
+                eyeOffIcon.classList.remove('hidden');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.classList.remove('hidden');
+                eyeOffIcon.classList.add('hidden');
+            }
+        }
+
+        function fillTestCredentials() {
+            document.querySelector('input[name="login"]').value = 'admin@app.com';
+            document.querySelector('input[name="password"]').value = 'password';
+        }
+
+        // Update redirect URL with current hash fragment if present
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const loginButton = document.getElementById('login-button');
+            const loginText = document.getElementById('login-text');
+            const loginLoading = document.getElementById('login-loading');
+            const redirectInput = document.getElementById('redirect');
+
+            // Update redirect URL with current hash fragment if present
+            if (redirectInput && window.location.hash) {
+                const currentUrl = new URL(window.location.href);
+                currentUrl.hash = window.location.hash;
+                redirectInput.value = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+            }
+
+            if (form && loginButton && loginText && loginLoading) {
+                form.addEventListener('submit', function() {
+                    // Disable button and prevent double submission
+                    loginButton.disabled = true;
+                    loginButton.classList.add('opacity-50', 'cursor-not-allowed');
+
+                    // Hide text and show loading
+                    loginText.style.display = 'none';
+                    loginLoading.classList.remove('hidden');
+                    loginLoading.style.display = 'flex';
+                });
+            }
+        });
+    </script>
+</x-layouts.auth>
+

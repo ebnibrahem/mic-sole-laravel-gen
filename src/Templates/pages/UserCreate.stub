@@ -1,0 +1,135 @@
+<script setup lang="ts">
+import { c } from '@shared/libs/filters';
+import { useApiHandler, createPrimeVueToastHandler } from '@dashboard/services/apiHandler';
+import type { User, Role } from '@shared/types/responses';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import UserForm from './_authorization/users/form.vue';
+import PageHeader from '@dashboard/layouts/PageHeader.vue';
+
+const router = useRouter();
+const toast = useToast();
+const { apiCall } = useApiHandler('dashboard');
+const toastHandler = createPrimeVueToastHandler(toast);
+
+const loading = ref(false);
+const roleOptions = ref<Array<{label: string, value: number}>>([]);
+
+// Load role options
+const loadRoleOptions = async () => {
+    loading.value = true;
+    try {
+        await apiCall<Role>({
+            endpoint: 'roles',
+            method: 'get',
+            params: {
+                per_page: 100
+            },
+            onSuccessPaginate: (data: Role[]) => {
+                roleOptions.value = data.map((role: Role) => ({
+                    label: role.title,
+                    value: role.id
+                }));
+            },
+            onError: (message) => {
+                toastHandler.error(message);
+            }
+        });
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Handle form submission
+const handleSubmit = async (formData: FormData, callbacks?: { onSuccess: () => void; onError: () => void }) => {
+    // Prevent double submission
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
+    try {
+        const result = await apiCall<User>({
+            endpoint: 'users',
+            method: 'post',
+            payload: formData,
+            useFormData: true,
+            onSuccess: (data, message) => {
+                toastHandler.success(message || c('user.messages.created'));
+                if (callbacks?.onSuccess) {
+                    callbacks.onSuccess();
+                }
+            },
+            onError: (message, code, validationErrors) => {
+                toastHandler.error(message);
+                if (callbacks?.onError) {
+                    callbacks.onError();
+                }
+            }
+        });
+
+        // Ensure callbacks are called even if onSuccess/onError are not triggered
+        if (result.success && callbacks?.onSuccess) {
+            callbacks.onSuccess();
+        } else if (!result.success && callbacks?.onError) {
+            callbacks.onError();
+        }
+    } catch (error) {
+        if (callbacks?.onError) {
+            callbacks.onError();
+        }
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Handle form cancellation
+const handleCancel = () => {
+    router.push({ name: 'authorization' });
+};
+
+// Handle go to list
+const handleGoToList = () => {
+    router.push({ name: 'authorization', query: { tab: 'users' } });
+};
+
+onMounted(() => {
+    loadRoleOptions();
+});
+</script>
+
+<template>
+    <div>
+        <PageHeader
+            :title="c('user.title')"
+            :description="c('user.create_description')"
+            icon="pi pi-user-plus"
+        >
+            <template #actions>
+                <AppButton
+                    :label="c('common.back')"
+                    icon="pi pi-arrow-right"
+                    severity="secondary"
+                    outlined
+                    @click="handleCancel"
+                />
+            </template>
+        </PageHeader>
+
+        <Card class="shadow-md">
+            <template #content>
+                <UserForm
+                    :loading="loading"
+                    :is-edit="false"
+                    :role-options="roleOptions"
+                    @submit="handleSubmit"
+                    @cancel="handleCancel"
+                    @go-to-list="handleGoToList"
+                />
+            </template>
+        </Card>
+    </div>
+</template>
+
+

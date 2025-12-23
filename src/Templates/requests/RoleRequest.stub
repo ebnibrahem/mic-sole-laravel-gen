@@ -1,0 +1,18 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class RoleRequest extends FormRequest
+{
+    public function authorize() { return true; }
+    public function rules() {
+        $roleId = $this->route('role') ?? $this->route('id');
+
+        return [
+            'title' => ['required', 'string', 'max:255', Rule::unique('roles', 'title')->ignore($roleId)],
+        ];
+    }
+}

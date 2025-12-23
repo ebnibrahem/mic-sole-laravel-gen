@@ -1,0 +1,313 @@
+<script setup lang="ts">
+import type { Application } from '@shared/types/responses';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { c } from '@dashboard/utilities/langHelper';
+import { useAuthStore } from '@shared/stores/auth_store';
+import LogoutButton from '@dashboard/components/LogoutButton.vue';
+
+defineOptions({
+    name: 'AppSidebar',
+});
+
+interface Props {
+    links: any[];
+    user: any;
+    application: Application | null;
+    collapsed: boolean;
+    mobileOpen: boolean;
+}
+
+const props = defineProps<Props>();
+const links = computed(() => props.links || []);
+const emit = defineEmits(['toggle-sidebar', 'close-mobile-sidebar']);
+
+const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
+
+const expandedItems = ref<Set<string>>(new Set());
+const windowWidth = ref(0);
+
+const isMobile = computed(() => {
+    return windowWidth.value <= 768;
+});
+
+onMounted(() => {
+    windowWidth.value = window.innerWidth;
+    const handleResize = () => {
+        windowWidth.value = window.innerWidth;
+    };
+    window.addEventListener('resize', handleResize);
+
+    onUnmounted(() => {
+        window.removeEventListener('resize', handleResize);
+    });
+
+    // Auto-expand menu items with children if current route matches
+    links.value.forEach((item) => {
+        if (item.children?.length && route.name === item.name) {
+            expandedItems.value.add(item.name);
+        }
+    });
+});
+
+const toggleChildren = (itemName: string, event?: Event) => {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    if (expandedItems.value.has(itemName)) {
+        expandedItems.value.delete(itemName);
+    } else {
+        expandedItems.value.clear();
+        expandedItems.value.add(itemName);
+    }
+};
+
+const closeSidebarInMobile = (hasChild = false) => {
+    if (hasChild) {
+        return;
+    }
+
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        emit('close-mobile-sidebar');
+    }
+};
+
+const handleSidebarToggle = () => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        emit('close-mobile-sidebar');
+    } else {
+        emit('toggle-sidebar');
+    }
+};
+
+const getLogoUrl = (logo: string | null | undefined): string => {
+    if (logo && String(logo).trim() !== '') {
+        // If logo starts with /, it's already a full path (fixed path like /images/logo.png)
+        if (logo.startsWith('/')) {
+            return logo;
+        }
+        // Otherwise, it's a storage path (like images/logo.png from DB)
+        return `/storage/${logo}`;
+    }
+    return '/images/logo.png';
+};
+</script>
+
+<template>
+    <aside
+        class="fixed top-0 right-0 h-screen bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 z-50 transition-all duration-300 flex flex-col shadow-lg"
+        :class="{
+            'w-[280px]': !collapsed,
+            'w-[70px]': collapsed,
+            'translate-x-full md:translate-x-0': !mobileOpen,
+            'translate-x-0': mobileOpen,
+        }"
+    >
+        <!-- Sidebar Header -->
+        <div class="flex items-center p-6 border-b border-gray-200 dark:border-gray-700"
+            :class="{
+                'justify-between': !collapsed,
+                'justify-center': collapsed
+            }"
+        >
+            <a
+                href="/"
+                class="flex items-center gap-x-3"
+            >
+                <img
+                    :src="getLogoUrl(application?.logo)"
+                    :alt="application?.name || 'Logo'"
+                    class="h-12 w-12 object-contain rounded-lg"
+                    onerror="this.onerror=null; this.src='/images/logo.png';"
+                />
+            </a>
+
+            <button
+                v-if="!collapsed"
+                @click="handleSidebarToggle"
+                class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors hidden md:block"
+            >
+                <i class="pi pi-bars"></i>
+            </button>
+
+            <button
+                v-if="!collapsed"
+                @click="closeSidebarInMobile()"
+                class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors md:hidden"
+            >
+                <i class="pi pi-times"></i>
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1 px-2">
+                <li
+                    v-for="(item, index) in links"
+                    :key="index"
+                    class="relative"
+                    :class="{
+                        'has-children': item.children?.length,
+                    }"
+                >
+                    <!-- Main Menu Item (No Children) -->
+                    <router-link
+                        v-if="!item.children?.length"
+                        :to="{ name: item.name }"
+                        class="flex items-center gap-x-3 px-4 py-3 rounded-lg transition-all duration-200 group"
+                        :class="{
+                            'text-white': route.name === item.name,
+                            'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': route.name !== item.name,
+                            'justify-center': collapsed,
+                        }"
+                        :style="route.name === item.name ? { backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' } : {}"
+                        @click="closeSidebarInMobile(false)"
+                    >
+                        <i :class="item.icon" class="text-xl flex-shrink-0"></i>
+                        <span v-show="!collapsed" class="font-medium">{{ item.label?.includes('.') ? c(item.label) : (c(item.label, 'common') || item.label) }}</span>
+
+                        <!-- Tooltip for collapsed state -->
+                        <div
+                            v-if="collapsed"
+                            class="absolute left-full ml-2 px-3 py-2 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50"
+                        >
+                            {{ item.label?.includes('.') ? c(item.label) : (c(item.label, 'common') || item.label) }}
+                        </div>
+                    </router-link>
+
+                    <!-- Parent Menu Item (With Children) -->
+                    <template v-else>
+                        <router-link
+                            :to="{ name: item.name, query: item.children?.[0]?.path?.includes('tab=') ? { tab: item.children[0].path.split('tab=')[1]?.split('&')[0] } : {} }"
+                            class="flex items-center gap-x-3 px-4 py-3 rounded-lg transition-all duration-200 group"
+                            :class="{
+                                'text-white': route.name === item.name,
+                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': route.name !== item.name,
+                                'justify-center': collapsed,
+                            }"
+                            :style="route.name === item.name ? { backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' } : {}"
+                            @click="closeSidebarInMobile(false)"
+                        >
+                            <i :class="item.icon" class="text-xl flex-shrink-0"></i>
+                            <span v-show="!collapsed" class="font-medium flex-1">{{
+                                item.label?.includes('.')
+                                    ? c(item.label)
+                                    : (c(item.label + '.plural', 'common') || c(item.label, 'common') || item.label)
+                            }}</span>
+
+                            <!-- Tooltip for collapsed state -->
+                            <div
+                                v-if="collapsed"
+                                class="absolute left-full ml-2 px-3 py-2 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50"
+                            >
+                                {{ item.label?.includes('.') ? c(item.label) : (c(item.label, 'common') || item.label) }}
+                            </div>
+                        </router-link>
+
+                        <span
+                            v-if="item.children?.length && !collapsed"
+                            class="absolute left-3 top-3 cursor-pointer"
+                            :class="{ 'rotate-180': expandedItems.has(item.name) || route.name === item.name }"
+                            @click="toggleChildren(item.name, $event)"
+                        >
+                            <i class="pi pi-angle-down text-xs text-gray-600 dark:text-gray-400 transition-transform duration-200"></i>
+                        </span>
+
+                        <!-- Children Menu Items -->
+                        <ul
+                            v-if="item.children?.length && !collapsed"
+                            class="mt-1 mr-4 space-y-1 overflow-hidden transition-all duration-300"
+                            :class="{ 'max-h-0': !expandedItems.has(item.name) && route.name !== item.name, 'max-h-96': expandedItems.has(item.name) || route.name === item.name }"
+                        >
+                            <li
+                                v-for="(child, childIndex) in item.children"
+                                :key="childIndex"
+                            >
+                                <router-link
+                                    :to="child.path"
+                                    class="flex items-center gap-x-3 px-4 py-2 rounded-lg transition-colors text-sm"
+                                    :class="{
+                                        'text-white': route.path === child.path.split('?')[0] || (route.name === item.name && route.query.tab === child.path.split('tab=')[1]?.split('&')[0]),
+                                        'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': route.path !== child.path.split('?')[0] && !(route.name === item.name && route.query.tab === child.path.split('tab=')[1]?.split('&')[0]),
+                                    }"
+                                    :style="(route.path === child.path.split('?')[0] || (route.name === item.name && route.query.tab === child.path.split('tab=')[1]?.split('&')[0])) ? { backgroundColor: 'var(--primary-500)', color: 'var(--primary-foreground)' } : {}"
+                                    @click="closeSidebarInMobile(false)"
+                                >
+                                    <i :class="child.icon || 'pi pi-circle'" class="text-xs"></i>
+                                    <span>{{
+                                        (() => {
+                                            if (!child.label) return '';
+                                            // Handle labels like 'user.plural', 'role.plural', 'permission.plural'
+                                            if (child.label.includes('.')) {
+                                                const [dir, key] = child.label.split('.');
+                                                // Special handling for plural forms
+                                                if (key === 'plural') {
+                                                    return c('plural', dir) || child.label;
+                                                }
+                                                // For other dot-separated labels, try to translate
+                                                return c(key, dir) || child.label;
+                                            }
+                                            // For simple labels, try common translations
+                                            return c(child.label, 'common') || child.label;
+                                        })()
+                                    }}</span>
+                                </router-link>
+                            </li>
+                        </ul>
+                    </template>
+                </li>
+            </ul>
+
+            <!-- Settings Menu Item (if not in main menu) -->
+            <div v-if="!links.find(item => item.name === 'settings')" class="mt-6 px-2">
+                <router-link
+                    :to="{ name: 'settings' }"
+                    class="flex items-center gap-x-3 px-4 py-3 rounded-lg transition-all duration-200 group"
+                    :class="{
+                        'text-white': route.name === 'settings',
+                        'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': route.name !== 'settings',
+                        'justify-center': collapsed,
+                    }"
+                    :style="route.name === 'settings' ? { backgroundColor: 'var(--sidebar-primary)', color: 'var(--sidebar-primary-foreground)' } : {}"
+                    @click="closeSidebarInMobile(false)"
+                >
+                    <i class="pi pi-cog text-xl flex-shrink-0"></i>
+                    <span v-if="!collapsed" class="font-medium">{{ c('setting.plural', 'common') || c('setting', 'common') || 'الإعدادات' }}</span>
+
+                    <!-- Tooltip for collapsed state -->
+                    <div
+                        v-if="collapsed"
+                        class="absolute left-full ml-2 px-3 py-2 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50"
+                    >
+                        {{ c('setting.plural', 'common') || c('setting', 'common') || 'الإعدادات' }}
+                    </div>
+                </router-link>
+            </div>
+
+            <!-- Logout Button -->
+            <div class="mt-6 px-2">
+                <LogoutButton>
+                    <div
+                        class="flex items-center gap-x-3 px-4 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer group"
+                        :class="{ 'justify-center': collapsed }"
+                    >
+                        <i class="pi pi-sign-out text-xl flex-shrink-0"></i>
+                        <span v-if="!collapsed" class="font-medium">{{ c('auth.logout', 'common') || 'تسجيل الخروج' }}</span>
+
+                        <!-- Tooltip for collapsed state -->
+                        <div
+                            v-if="collapsed"
+                            class="absolute left-full ml-2 px-3 py-2 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50"
+                        >
+                            {{ c('auth.logout', 'common') || 'تسجيل الخروج' }}
+                        </div>
+                    </div>
+                </LogoutButton>
+            </div>
+        </nav>
+    </aside>
+</template>
+

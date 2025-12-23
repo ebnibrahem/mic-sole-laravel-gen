@@ -1,0 +1,259 @@
+<script setup lang="ts">
+import { ref, onMounted, computed, watch } from 'vue';
+import { c } from '@shared/libs/filters';
+import { useApiHandler } from '@dashboard/services/apiHandler';
+import { AppChart } from '@shared/components';
+
+interface Statistic {
+    label: string;
+    value: number | string;
+    icon: string;
+    color: string;
+    change?: number;
+    changeType?: 'positive' | 'negative';
+}
+
+type Period = 'today' | 'week' | 'month' | 'year';
+
+const { apiCall } = useApiHandler('dashboard');
+const loading = ref(false);
+const statistics = ref<Statistic[]>([]);
+const selectedPeriod = ref<Period>('month');
+
+// Load statistics
+const loadStatistics = async (period: Period = 'month') => {
+    loading.value = true;
+    await apiCall({
+        endpoint: 'dashboard/statistics',
+        method: 'get',
+        params: { period },
+        onSuccess: (data: any) => {
+            // Transform API response to statistics array
+            if (data && typeof data === 'object') {
+                statistics.value = [
+                    {
+                        label: c('statistics.users', 'common') || 'المستخدمين',
+                        value: data.users_count || 0,
+                        icon: 'pi pi-users',
+                        color: 'bg-blue-500',
+                        change: data.users_change,
+                        changeType: data.users_change && data.users_change > 0 ? 'positive' : 'negative'
+                    },
+                    {
+                        label: c('statistics.roles', 'common') || 'الأدوار',
+                        value: data.roles_count || 0,
+                        icon: 'pi pi-id-card',
+                        color: 'bg-green-500',
+                        change: data.roles_change,
+                        changeType: data.roles_change && data.roles_change > 0 ? 'positive' : 'negative'
+                    },
+                    {
+                        label: c('statistics.permissions', 'common') || 'الصلاحيات',
+                        value: data.permissions_count || 0,
+                        icon: 'pi pi-key',
+                        color: 'bg-purple-500',
+                        change: data.permissions_change,
+                        changeType: data.permissions_change && data.permissions_change > 0 ? 'positive' : 'negative'
+                    },
+                    {
+                        label: c('statistics.active_users', 'common') || 'المستخدمين النشطين',
+                        value: data.active_users_count || 0,
+                        icon: 'pi pi-check-circle',
+                        color: 'bg-teal-500',
+                        change: data.active_users_change,
+                        changeType: data.active_users_change && data.active_users_change > 0 ? 'positive' : 'negative'
+                    }
+                ];
+            }
+        },
+        onError: () => {
+            // If API fails, show empty statistics
+            statistics.value = [];
+        }
+    });
+    loading.value = false;
+};
+
+// Watch for period changes
+watch(selectedPeriod, (newPeriod) => {
+    loadStatistics(newPeriod);
+});
+
+const periods = [
+    { value: 'today', label: c('statistics.periods.today', 'common') || 'اليوم' },
+    { value: 'week', label: c('statistics.periods.week', 'common') || 'الأسبوع' },
+    { value: 'month', label: c('statistics.periods.month', 'common') || 'الشهر' },
+    { value: 'year', label: c('statistics.periods.year', 'common') || 'السنة' },
+];
+
+// Chart data
+const chartData = computed(() => {
+    if (statistics.value.length === 0) {
+        return {
+            labels: [],
+            datasets: [],
+        };
+    }
+
+    return {
+        labels: statistics.value.map(stat => stat.label),
+        datasets: [
+            {
+                label: c('statistics.count', 'common') || 'العدد',
+                data: statistics.value.map(stat => Number(stat.value) || 0),
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.8)', // blue
+                    'rgba(34, 197, 94, 0.8)', // green
+                    'rgba(168, 85, 247, 0.8)', // purple
+                    'rgba(20, 184, 166, 0.8)', // teal
+                ],
+                borderColor: [
+                    'rgba(59, 130, 246, 1)',
+                    'rgba(34, 197, 94, 1)',
+                    'rgba(168, 85, 247, 1)',
+                    'rgba(20, 184, 166, 1)',
+                ],
+                borderWidth: 2,
+            },
+        ],
+    };
+});
+
+// Chart options
+const chartOptions = computed(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: false,
+        },
+        tooltip: {
+            enabled: true,
+            rtl: true,
+            callbacks: {
+                label: function(context: any) {
+                    return `${context.dataset.label}: ${context.parsed.y}`;
+                },
+            },
+        },
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            ticks: {
+                stepSize: 1,
+            },
+        },
+        x: {
+            ticks: {
+                maxRotation: 45,
+                minRotation: 45,
+            },
+        },
+    },
+}));
+
+onMounted(() => {
+    loadStatistics();
+});
+</script>
+
+<template>
+    <div class="mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">
+                {{ c('statistics.title', 'common') || 'الإحصائيات' }}
+            </h3>
+            <div class="flex items-center gap-2 statistics-period-filter">
+                <button
+                    v-for="period in periods"
+                    :key="period.value"
+                    :class="[
+                        'px-4 py-2 rounded-md text-sm font-medium transition-all',
+                        selectedPeriod === period.value
+                            ? 'bg-primary text-white shadow-md'
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    ]"
+                    @click="selectedPeriod = period.value as Period"
+                >
+                    {{ period.label }}
+                </button>
+            </div>
+        </div>
+
+        <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div v-for="i in 4" :key="i" class="bg-white rounded-lg shadow-md p-6 animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div class="h-8 bg-gray-200 rounded w-1/2"></div>
+            </div>
+        </div>
+
+        <div v-else-if="statistics.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card
+                v-for="(stat, index) in statistics"
+                :key="index"
+                class="hover:shadow-lg transition-shadow duration-300"
+            >
+                <template #content>
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="text-sm text-gray-600 mb-2">
+                                {{ stat.label }}
+                            </div>
+                            <div class="text-3xl font-bold text-gray-900">
+                                {{ stat.value }}
+                            </div>
+                            <div v-if="stat.change !== undefined" class="mt-2 flex items-center gap-1">
+                                <i
+                                    :class="[
+                                        stat.changeType === 'positive' ? 'pi pi-arrow-up text-green-500' : 'pi pi-arrow-down text-red-500',
+                                        'text-xs'
+                                    ]"
+                                ></i>
+                                <span
+                                    :class="[
+                                        'text-xs font-medium',
+                                        stat.changeType === 'positive' ? 'text-green-500' : 'text-red-500'
+                                    ]"
+                                >
+                                    {{ Math.abs(stat.change) }}%
+                                </span>
+                            </div>
+                        </div>
+                        <div :class="['w-12 h-12 rounded-lg flex items-center justify-center', stat.color]">
+                            <i :class="[stat.icon, 'text-white text-xl']"></i>
+                        </div>
+                    </div>
+                </template>
+            </Card>
+        </div>
+
+        <div v-else class="text-center py-8 text-gray-500">
+            <i class="pi pi-chart-bar text-4xl mb-4 text-gray-300"></i>
+            <p>{{ c('statistics.no_data', 'common') || 'لا توجد إحصائيات متاحة' }}</p>
+        </div>
+
+        <!-- Chart Section -->
+        <div v-if="statistics.length > 0" class="mt-8">
+            <Card>
+                <template #title>
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-chart-bar text-xl text-blue-500"></i>
+                        <span class="text-lg font-semibold">
+                            {{ c('statistics.chart_title', 'common') || 'مخطط الإحصائيات' }}
+                        </span>
+                    </div>
+                </template>
+                <template #content>
+                    <div class="h-80">
+                        <AppChart
+                            type="bar"
+                            :chart-data="chartData"
+                        />
+                    </div>
+                </template>
+            </Card>
+        </div>
+    </div>
+</template>
+

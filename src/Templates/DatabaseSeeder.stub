@@ -1,0 +1,40 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\User;
+use App\Models\Role;
+use App\Models\Permission;
+
+class DatabaseSeeder extends Seeder
+{
+    /**
+     * Seed the application's database.
+     */
+    public function run(): void
+    {
+        // Seed basic data for Mic-Sole dashboard example
+        $this->call([
+            ApplicationSeeder::class,
+            UserSeeder::class,
+            PermissionSeeder::class,
+            RoleSeeder::class,
+        ]);
+
+        // Assign all permissions to System Admin role
+        $adminRole = Role::where('title', 'مدير النظام')->first();
+        if ($adminRole) {
+            $allPermissions = Permission::all();
+            $adminRole->permissions()->sync($allPermissions->pluck('id')->toArray());
+        }
+
+        // Assign System Admin role to user #1
+        $user = User::find(1);
+        if ($user && $adminRole) {
+            $user->roles()->sync([$adminRole->id]);
+        }
+    }
+}
+
+

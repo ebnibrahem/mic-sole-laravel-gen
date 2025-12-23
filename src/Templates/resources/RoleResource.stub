@@ -1,0 +1,40 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class RoleResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array|\Illuminate\Contracts\Support\Arrayable|\JsonSerializable
+     */
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+            'title' => $this->title ?? null,
+            'permissions' => $this->whenLoaded('permissions', function () {
+                return $this->permissions->map(function ($permission) {
+                    return [
+                        'id' => $permission->id,
+                        'name' => $permission->name ?? null,
+                        'title' => $permission->title ?? null,
+                        'is_active' => $permission->is_active ?? true,
+                    ];
+                });
+            }, []),
+            'permissions_count' => $this->whenLoaded('permissions', function () {
+                return $this->permissions->count();
+            }, 0),
+            'users_count' => $this->whenLoaded('users', function () {
+                return $this->users->count();
+            }, 0),
+            'created_at' => $this->created_at ? $this->created_at->format('Y-m-d H:i:s') : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->format('Y-m-d H:i:s') : null,
+        ];
+    }
+}

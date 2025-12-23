@@ -1,0 +1,8 @@
+<?php
+
+use App\Http\Controllers\EditorController;
+use Illuminate\Support\Facades\Route;
+
+// Editor routes (for rich text editor image uploads)
+Route::post('editor/upload-image', [EditorController::class, 'uploadImage'])->name('editor.upload-image');
+

@@ -1,0 +1,242 @@
+<template>
+  <div class="app-chart">
+    <Bar
+      v-if="type === 'bar' && !hasMixedTypes"
+      :data="finalChartData"
+      :options="chartOptions"
+      :id="chartId"
+    />
+    <Line
+      v-if="type === 'line' || hasMixedTypes || type === 'area'"
+      :data="type === 'area' ? areaChartData : finalChartData"
+      :options="type === 'area' ? areaChartOptions : chartOptions"
+      :id="chartId"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { Bar, Line } from 'vue-chartjs';
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+} from 'chart.js';
+import { computed } from 'vue';
+
+// تسجيل Chart.js components
+ChartJS.register(
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler
+);
+
+interface Props {
+  data?: any[];
+  chartData?: {
+    labels?: string[];
+    datasets?: any[];
+  } | null;
+  type?: 'bar' | 'line' | 'area';
+  labels?: string[];
+  backgroundColor?: string;
+  borderColor?: string;
+  size?: { width: number; height: number };
+  direction?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  data: () => [],
+  chartData: null,
+  type: 'bar',
+  labels: () => [],
+  backgroundColor: '#3b82f6',
+  borderColor: '#3b82f6',
+  size: () => ({ width: 500, height: 300 }),
+  direction: 'ltr',
+});
+
+// إنشاء ID فريد للمخطط
+const chartId = computed(() => `chart-${props.type}-${Math.random().toString(36).substr(2, 9)}`);
+
+// التحقق من وجود mixed chart types
+const hasMixedTypes = computed(() => {
+  if (!props.chartData || !props.chartData.datasets) return false;
+  const types = props.chartData.datasets.map((d: any) => d.type).filter(Boolean);
+  return new Set(types).size > 1;
+});
+
+// البيانات النهائية للمخطط
+const finalChartData = computed(() => {
+  if (props.chartData && props.chartData.labels && props.chartData.datasets) {
+    return props.chartData;
+  }
+  return chartData.value;
+});
+
+// تحويل البيانات إلى تنسيق Chart.js
+const chartData = computed(() => {
+  // إذا تم تمرير chartData مباشرة (للمخططات المتعددة)
+  if (props.chartData && props.chartData.labels && props.chartData.datasets) {
+    return props.chartData;
+  }
+
+  if (!props.data || props.data.length === 0) {
+    return {
+      labels: [],
+      datasets: [],
+    };
+  }
+
+  // تحويل Proxy إلى array عادي
+  let rawData: any[];
+  try {
+    rawData = JSON.parse(JSON.stringify(props.data));
+    if (!Array.isArray(rawData)) {
+      rawData = [];
+    }
+  } catch (e) {
+    rawData = Array.isArray(props.data) ? [...props.data] : [];
+  }
+
+  // استخراج labels و values
+  let labels: string[] = [];
+  let values: number[] = [];
+
+  if (rawData[0] && typeof rawData[0] === 'object') {
+    if (rawData[0].name !== undefined && rawData[0].value !== undefined) {
+      labels = rawData.map((item: any) => String(item.name || ''));
+      values = rawData.map((item: any) => Number(item.value || 0));
+    } else if (rawData[0].label !== undefined && rawData[0].value !== undefined) {
+      labels = rawData.map((item: any) => String(item.label || ''));
+      values = rawData.map((item: any) => Number(item.value || 0));
+    } else if (props.labels && props.labels.length > 0) {
+      labels = props.labels.map((l) => String(l));
+      values = rawData.map((v: any) => Number(v || 0));
+    }
+  } else {
+    labels =
+      props.labels && props.labels.length > 0
+        ? props.labels.map((l) => String(l))
+        : rawData.map((_, i) => `Item ${i + 1}`);
+    values = rawData.map((v: any) => Number(v || 0));
+  }
+
+  return {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Data',
+        data: values,
+        backgroundColor: props.backgroundColor,
+        borderColor: props.borderColor,
+        borderWidth: 1,
+      },
+    ],
+  };
+});
+
+// Chart options
+const chartOptions = computed(() => {
+  // التحقق إذا كان هناك datasets متعددة (مخطط موحد)
+  const data = finalChartData.value;
+  const hasMultipleDatasets = data && data.datasets && data.datasets.length > 1;
+  const hasY1Axis = data && data.datasets?.some((d: any) => d.yAxisID === 'y1');
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        display: hasMultipleDatasets,
+        position: 'top' as const,
+      },
+      tooltip: {
+        enabled: true,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        position: 'left' as const,
+        title: {
+          display: true,
+          text: 'العدد',
+        },
+      },
+      ...(hasY1Axis
+        ? {
+            y1: {
+              beginAtZero: true,
+              position: 'right' as const,
+              grid: {
+                drawOnChartArea: false,
+              },
+              title: {
+                display: true,
+                text: 'المبلغ',
+              },
+            },
+          }
+        : {}),
+    },
+  };
+});
+
+// Area chart data (مع fill)
+const areaChartData = computed(() => {
+  const baseData = chartData.value;
+  return {
+    ...baseData,
+    datasets: baseData.datasets.map((dataset: any) => ({
+      ...dataset,
+      fill: true,
+      tension: 0.4,
+    })),
+  };
+});
+
+// Area chart options
+const areaChartOptions = computed(() => {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+});
+</script>
+
+<style scoped>
+.app-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+}
+</style>
+
