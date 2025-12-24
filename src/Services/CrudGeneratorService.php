@@ -42,7 +42,7 @@ class CrudGeneratorService
 
     public function __construct()
     {
-        $this->stubPath = base_path('mic-sole-laravel-gen/src/Templates/');
+        $this->stubPath = \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getTemplatesPath() . '/';
         $this->tracker = new FileTrackerService();
     }
 

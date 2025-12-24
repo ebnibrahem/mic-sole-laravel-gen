@@ -67,7 +67,7 @@ class VerifyTemplatesCommand extends Command
     public function handle()
     {
         $this->basePath = base_path();
-        $this->stubPath = base_path('mic-sole-laravel-gen/src/Templates/');
+        $this->stubPath = \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getTemplatesPath() . '/';
 
         $this->info('🔍 Verifying template stubs compatibility...');
         $this->newLine();

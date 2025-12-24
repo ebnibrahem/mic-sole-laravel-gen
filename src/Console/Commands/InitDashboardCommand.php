@@ -29,6 +29,17 @@ class InitDashboardCommand extends Command
     protected $description = 'Initialize complete dashboard structure with optional Post example';
 
     /**
+     * Get stub file path
+     *
+     * @param string $stubPath Relative path from Templates directory
+     * @return string
+     */
+    protected function getStubPath(string $stubPath): string
+    {
+        return \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getStubPath($stubPath);
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle(
@@ -243,7 +254,7 @@ class InitDashboardCommand extends Command
         }
 
         $controllerPath = $controllerDir . '/AuthController.php';
-        $stubPath = base_path('mic-sole-laravel-gen/src/Templates/controller/AuthController.stub');
+        $stubPath = $this->getStubPath('controller/AuthController.stub');
 
         if (file_exists($stubPath) && !file_exists($controllerPath)) {
             $controllerContent = file_get_contents($stubPath);
@@ -282,7 +293,7 @@ class InitDashboardCommand extends Command
         }
 
         $traitPath = $traitsDir . '/MicResponseTrait.php';
-        $traitStub = base_path('mic-sole-laravel-gen/src/Templates/traits/MicResponseTrait.stub');
+        $traitStub = $this->getStubPath('traits/MicResponseTrait.stub');
 
         if (file_exists($traitStub) && !file_exists($traitPath)) {
             copy($traitStub, $traitPath);
@@ -307,12 +318,12 @@ class InitDashboardCommand extends Command
             mkdir($requestsDir, 0755, true);
         }
 
-        $stubPath = base_path('mic-sole-laravel-gen/src/Templates/requests/Auth/');
+        $stubPath = $this->getStubPath('requests/Auth/');
         $trackedFiles = [];
 
         // Create LoginRequest
         $loginRequestPath = $requestsDir . '/LoginRequest.php';
-        $loginRequestStub = $stubPath . 'LoginRequest.stub';
+        $loginRequestStub = $stubPath . '/LoginRequest.stub';
         if (file_exists($loginRequestStub) && !file_exists($loginRequestPath)) {
             copy($loginRequestStub, $loginRequestPath);
             $trackedFiles[] = [
@@ -324,13 +335,25 @@ class InitDashboardCommand extends Command
 
         // Create RegisterRequest
         $registerRequestPath = $requestsDir . '/RegisterRequest.php';
-        $registerRequestStub = $stubPath . 'RegisterRequest.stub';
+        $registerRequestStub = $stubPath . '/RegisterRequest.stub';
         if (file_exists($registerRequestStub) && !file_exists($registerRequestPath)) {
             copy($registerRequestStub, $registerRequestPath);
             $trackedFiles[] = [
                 'type' => 'request',
                 'path' => $registerRequestPath,
                 'relative_path' => str_replace(base_path() . '/', '', $registerRequestPath),
+            ];
+        }
+
+        // Create PasswordResetRequest
+        $passwordResetRequestPath = $requestsDir . '/PasswordResetRequest.php';
+        $passwordResetRequestStub = $stubPath . '/PasswordResetRequest.stub';
+        if (file_exists($passwordResetRequestStub) && !file_exists($passwordResetRequestPath)) {
+            copy($passwordResetRequestStub, $passwordResetRequestPath);
+            $trackedFiles[] = [
+                'type' => 'request',
+                'path' => $passwordResetRequestPath,
+                'relative_path' => str_replace(base_path() . '/', '', $passwordResetRequestPath),
             ];
         }
 
@@ -349,7 +372,7 @@ class InitDashboardCommand extends Command
         }
 
         $authGatesPath = $middlewareDir . '/AuthGates.php';
-        $authGatesStub = base_path('mic-sole-laravel-gen/src/Templates/middleware/AuthGates.stub');
+        $authGatesStub = $this->getStubPath('middleware/AuthGates.stub');
 
         if (file_exists($authGatesStub) && !file_exists($authGatesPath)) {
             copy($authGatesStub, $authGatesPath);
@@ -375,7 +398,7 @@ class InitDashboardCommand extends Command
         }
 
         $micApiResponsePath = $exceptionsDir . '/MICApiResponse.php';
-        $micApiResponseStub = base_path('mic-sole-laravel-gen/src/Templates/exceptions/MICApiResponse.stub');
+        $micApiResponseStub = $this->getStubPath('exceptions/MICApiResponse.stub');
 
         if (file_exists($micApiResponseStub) && !file_exists($micApiResponsePath)) {
             copy($micApiResponseStub, $micApiResponsePath);
@@ -396,7 +419,7 @@ class InitDashboardCommand extends Command
     protected function updateControllerBase(): ?array
     {
         $controllerPath = base_path('app/Http/Controllers/Controller.php');
-        $controllerStub = base_path('mic-sole-laravel-gen/src/Templates/Controller.stub');
+        $controllerStub = $this->getStubPath('Controller.stub');
 
         if (file_exists($controllerStub)) {
             $stubContent = file_get_contents($controllerStub);
@@ -435,7 +458,7 @@ class InitDashboardCommand extends Command
     protected function createDatabaseSeeder(): void
     {
         $seederPath = base_path('database/seeders/DatabaseSeeder.php');
-        $seederStub = base_path('mic-sole-laravel-gen/src/Templates/DatabaseSeeder.stub');
+        $seederStub = $this->getStubPath('DatabaseSeeder.stub');
 
         if (file_exists($seederStub) && !file_exists($seederPath)) {
             copy($seederStub, $seederPath);
@@ -569,7 +592,7 @@ PHP;
         }
 
         $controllerPath = $controllerDir . '/AuthenticatedSessionController.php';
-        $controllerStub = base_path('mic-sole-laravel-gen/src/Templates/controller/AuthenticatedSessionController.stub');
+        $controllerStub = $this->getStubPath('controller/AuthenticatedSessionController.stub');
 
         if (file_exists($controllerStub) && !file_exists($controllerPath)) {
             copy($controllerStub, $controllerPath);
@@ -577,6 +600,30 @@ PHP;
                 'type' => 'controller',
                 'path' => $controllerPath,
                 'relative_path' => str_replace(base_path() . '/', '', $controllerPath),
+            ];
+        }
+
+        // Create PasswordResetLinkController
+        $passwordResetLinkPath = $controllerDir . '/PasswordResetLinkController.php';
+        $passwordResetLinkStub = $this->getStubPath('controller/PasswordResetLinkController.stub');
+        if (file_exists($passwordResetLinkStub) && !file_exists($passwordResetLinkPath)) {
+            copy($passwordResetLinkStub, $passwordResetLinkPath);
+            $createdFiles[] = [
+                'type' => 'controller',
+                'path' => $passwordResetLinkPath,
+                'relative_path' => str_replace(base_path() . '/', '', $passwordResetLinkPath),
+            ];
+        }
+
+        // Create NewPasswordController
+        $newPasswordPath = $controllerDir . '/NewPasswordController.php';
+        $newPasswordStub = $this->getStubPath('controller/NewPasswordController.stub');
+        if (file_exists($newPasswordStub) && !file_exists($newPasswordPath)) {
+            copy($newPasswordStub, $newPasswordPath);
+            $createdFiles[] = [
+                'type' => 'controller',
+                'path' => $newPasswordPath,
+                'relative_path' => str_replace(base_path() . '/', '', $newPasswordPath),
             ];
         }
 
@@ -588,7 +635,7 @@ PHP;
 
         // Create login.blade.php
         $loginViewPath = $authViewsDir . '/login.blade.php';
-        $loginStub = base_path('mic-sole-laravel-gen/src/Templates/views/auth/login.blade.stub');
+        $loginStub = $this->getStubPath('views/auth/login.blade.stub');
         if (file_exists($loginStub) && !file_exists($loginViewPath)) {
             copy($loginStub, $loginViewPath);
             $createdFiles[] = [
@@ -606,7 +653,7 @@ PHP;
 
         // Create layouts/auth.blade.php
         $layoutPath = $layoutsDir . '/auth.blade.php';
-        $layoutStub = base_path('mic-sole-laravel-gen/src/Templates/views/layouts/auth.blade.stub');
+        $layoutStub = $this->getStubPath('views/layouts/auth.blade.stub');
         if (file_exists($layoutStub) && !file_exists($layoutPath)) {
             copy($layoutStub, $layoutPath);
             $createdFiles[] = [
@@ -624,7 +671,7 @@ PHP;
 
         // Create components/layouts/auth.blade.php
         $componentLayoutPath = $componentsLayoutsDir . '/auth.blade.php';
-        $componentLayoutStub = base_path('mic-sole-laravel-gen/src/Templates/views/components/layouts/auth.blade.stub');
+        $componentLayoutStub = $this->getStubPath('views/components/layouts/auth.blade.stub');
         if (file_exists($componentLayoutStub) && !file_exists($componentLayoutPath)) {
             copy($componentLayoutStub, $componentLayoutPath);
             $createdFiles[] = [
@@ -642,7 +689,7 @@ PHP;
 
         // Create form-input.blade.php
         $formInputPath = $componentsAuthDir . '/form-input.blade.php';
-        $formInputStub = base_path('mic-sole-laravel-gen/src/Templates/views/components/auth/form-input.blade.stub');
+        $formInputStub = $this->getStubPath('views/components/auth/form-input.blade.stub');
         if (file_exists($formInputStub) && !file_exists($formInputPath)) {
             copy($formInputStub, $formInputPath);
             $createdFiles[] = [
@@ -654,7 +701,7 @@ PHP;
 
         // Create form-checkbox.blade.php
         $formCheckboxPath = $componentsAuthDir . '/form-checkbox.blade.php';
-        $formCheckboxStub = base_path('mic-sole-laravel-gen/src/Templates/views/components/auth/form-checkbox.blade.stub');
+        $formCheckboxStub = $this->getStubPath('views/components/auth/form-checkbox.blade.stub');
         if (file_exists($formCheckboxStub) && !file_exists($formCheckboxPath)) {
             copy($formCheckboxStub, $formCheckboxPath);
             $createdFiles[] = [
@@ -666,7 +713,7 @@ PHP;
 
         // Create alert.blade.php
         $alertPath = $componentsAuthDir . '/alert.blade.php';
-        $alertStub = base_path('mic-sole-laravel-gen/src/Templates/views/components/auth/alert.blade.stub');
+        $alertStub = $this->getStubPath('views/components/auth/alert.blade.stub');
         if (file_exists($alertStub) && !file_exists($alertPath)) {
             copy($alertStub, $alertPath);
             $createdFiles[] = [
@@ -689,15 +736,22 @@ PHP;
 
         // Create routes/auth.php
         $authRoutesPath = base_path('routes/auth.php');
-        $authRoutesStub = base_path('mic-sole-laravel-gen/src/Templates/routes/auth.stub');
+        $authRoutesStub = $this->getStubPath('routes/auth.stub');
 
-        if (file_exists($authRoutesStub) && !file_exists($authRoutesPath)) {
-            copy($authRoutesStub, $authRoutesPath);
-            $trackedFiles[] = [
-                'type' => 'routes',
-                'path' => $authRoutesPath,
-                'relative_path' => str_replace(base_path() . '/', '', $authRoutesPath),
-            ];
+        // Always update routes/auth.php from stub if it exists (to ensure it has correct content)
+        if (file_exists($authRoutesStub)) {
+            // Check if file doesn't exist or is empty/small (less than 100 bytes)
+            $shouldUpdate = !file_exists($authRoutesPath) || 
+                           (file_exists($authRoutesPath) && filesize($authRoutesPath) < 100);
+            
+            if ($shouldUpdate) {
+                copy($authRoutesStub, $authRoutesPath);
+                $trackedFiles[] = [
+                    'type' => 'routes',
+                    'path' => $authRoutesPath,
+                    'relative_path' => str_replace(base_path() . '/', '', $authRoutesPath),
+                ];
+            }
         }
 
         // Update web.php to include auth routes

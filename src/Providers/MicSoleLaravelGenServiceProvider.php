@@ -65,5 +65,36 @@ class MicSoleLaravelGenServiceProvider extends ServiceProvider
     {
         MICApiResponse::exceptions($exceptions);
     }
+
+    /**
+     * Get package root path
+     *
+     * @return string
+     */
+    public static function getPackagePath(): string
+    {
+        return dirname(__DIR__, 2);
+    }
+
+    /**
+     * Get templates path
+     *
+     * @return string
+     */
+    public static function getTemplatesPath(): string
+    {
+        return self::getPackagePath() . '/src/Templates';
+    }
+
+    /**
+     * Get stub file path
+     *
+     * @param string $stubPath Relative path from Templates directory
+     * @return string
+     */
+    public static function getStubPath(string $stubPath): string
+    {
+        return self::getTemplatesPath() . '/' . ltrim($stubPath, '/');
+    }
 }
 

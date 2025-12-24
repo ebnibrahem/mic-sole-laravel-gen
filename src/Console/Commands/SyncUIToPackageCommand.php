@@ -45,7 +45,7 @@ class SyncUIToPackageCommand extends Command
     public function handle()
     {
         $this->projectPath = base_path();
-        $this->packagePath = base_path('mic-sole-laravel-gen');
+        $this->packagePath = \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getPackagePath();
 
         $force = $this->option('force');
         $dryRun = $this->option('dry-run');

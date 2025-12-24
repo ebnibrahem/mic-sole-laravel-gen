@@ -84,7 +84,7 @@ class InstallUICommand extends Command
      */
     public function handle()
     {
-        $this->packagePath = base_path('mic-sole-laravel-gen');
+        $this->packagePath = \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getPackagePath();
         $this->projectPath = base_path();
 
         $force = $this->option('force');

@@ -13,7 +13,7 @@ class DashboardSetupService
     public function __construct()
     {
         $this->basePath = base_path();
-        $this->stubPath = base_path('mic-sole-laravel-gen/src/Templates/');
+        $this->stubPath = \MicSoleLaravelGen\Providers\MicSoleLaravelGenServiceProvider::getTemplatesPath() . '/';
     }
 
     /**

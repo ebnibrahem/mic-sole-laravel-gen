@@ -3,6 +3,7 @@
     "description": "Laravel CRUD Generator Package with Vue/React Frontend Support",
     "type": "library",
     "license": "MIT",
+    "version": "1.0.1",
     "keywords": [
         "laravel",
         "crud",
@@ -45,4 +46,3 @@
     "minimum-stability": "stable",
     "prefer-stable": true
 }
-
